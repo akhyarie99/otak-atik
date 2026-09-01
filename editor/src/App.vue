@@ -3,8 +3,8 @@ import { onMounted, ref, shallowRef } from 'vue'
 import * as Blockly from 'blockly/core'
 import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
-import { Panggung } from '@otak-atik/runtime'
-import { daftarkanBlokContoh, TOOLBOX_CONTOH } from './blok-contoh'
+import { Interpreter, Panggung } from '@otak-atik/runtime'
+import { daftarkanBlokContoh, programAstContoh, TOOLBOX_CONTOH } from './blok-contoh'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -12,11 +12,46 @@ const tabAktif = ref('json')
 const isiJson = ref('// Susun blok untuk melihat project.json di sini.')
 const workspace = shallowRef(null)
 const panggung = shallowRef(null)
+const interpreter = shallowRef(null)
+const sedangJalan = ref(false)
+const kecepatan = ref('normal')
+const pesanJalan = ref('')
 
 function simpanKeJson() {
   if (!workspace.value) return
   const data = Blockly.serialization.workspaces.save(workspace.value)
   isiJson.value = JSON.stringify(data, null, 2)
+}
+
+function sorotBlok(id) {
+  try {
+    workspace.value.highlightBlock(id)
+  } catch {
+    // workspace belum siap atau id tidak ada — aman diabaikan.
+  }
+}
+
+function jalankan() {
+  const bendera = workspace.value.getTopBlocks(true).find((b) => b.type === 'ketika_dijalankan')
+  if (!bendera) {
+    pesanJalan.value = 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
+    return
+  }
+  pesanJalan.value = ''
+  const programAst = programAstContoh(workspace.value)
+  interpreter.value.aturKecepatan(kecepatan.value)
+  interpreter.value.mulai(programAst)
+  sedangJalan.value = true
+}
+
+function berhenti() {
+  interpreter.value.berhenti()
+  sedangJalan.value = false
+}
+
+function ubahKecepatan(nama) {
+  kecepatan.value = nama
+  if (interpreter.value) interpreter.value.aturKecepatan(nama)
 }
 
 onMounted(() => {
@@ -37,14 +72,24 @@ onMounted(() => {
   simpanKeJson()
 
   panggung.value = new Panggung(kanvasPanggung.value)
+  interpreter.value = new Interpreter(panggung.value, {
+    onLangkah: sorotBlok,
+    onSelesai: () => {
+      sedangJalan.value = false
+    },
+    onError: (e) => {
+      sedangJalan.value = false
+      pesanJalan.value = 'Program berhenti karena galat: ' + e.message
+      console.error(e)
+    },
+  })
 
-  // Milestone 1.2: Game API harus bisa dicoba langsung dari konsol.
-  // Dihapus lagi begitu interpreter (1.3) menjalankan panggung sendiri.
+  // Game API tetap bisa dicoba langsung dari konsol saat dev (milestone 1.2).
   if (import.meta.env.DEV) {
     window.panggung = panggung.value
-    console.info(
-      'Panggung siap diuji dari konsol, contoh: panggung.maju(80); panggung.putar(90)',
-    )
+    window.interpreter = interpreter.value
+    window.workspace = workspace.value
+    window.Blockly = Blockly
   }
 })
 </script>
@@ -72,11 +117,29 @@ onMounted(() => {
         <section class="panel panel-panggung">
           <div class="panel-kepala">
             <span class="judul">Panggung</span>
-            <span class="ket">Si Pensil, lapisan pena, dan pantulan tepi — dijalankan interpreter di milestone 1.3</span>
+            <span class="ket">Si Pensil, lapisan pena, dan pantulan tepi</span>
           </div>
           <div class="panggung-bungkus">
             <canvas ref="kanvasPanggung" width="480" height="360" role="img" aria-label="Panggung tempat si Pensil bergerak"></canvas>
           </div>
+          <div class="kendali">
+            <button class="tbl jalan" :disabled="sedangJalan" @click="jalankan">▶ Jalankan</button>
+            <button class="tbl henti" :disabled="!sedangJalan" @click="berhenti">■ Berhenti</button>
+            <div class="kanan">
+              <label for="seg-kecepatan">Kecepatan</label>
+              <div class="seg" id="seg-kecepatan" role="group" aria-label="Kecepatan jalan">
+                <button
+                  v-for="nama in ['lambat', 'normal', 'kilat']"
+                  :key="nama"
+                  :aria-pressed="kecepatan === nama"
+                  @click="ubahKecepatan(nama)"
+                >
+                  {{ nama[0].toUpperCase() + nama.slice(1) }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <p v-if="pesanJalan" class="pesan-galat">{{ pesanJalan }}</p>
         </section>
 
         <section class="panel panel-kode">
@@ -198,6 +261,85 @@ canvas {
   background: #fff;
   border: 1px solid var(--garis);
   border-radius: 12px;
+}
+
+.kendali {
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--garis);
+}
+.kendali .kanan {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kendali label {
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  font-weight: 500;
+}
+
+.tbl {
+  font-family: 'Baloo 2', inherit;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #fff;
+  background: var(--tinta);
+}
+.tbl:active {
+  transform: translateY(1px);
+}
+.tbl.jalan {
+  background: #12a472;
+}
+.tbl.henti {
+  background: #e14b4b;
+}
+.tbl[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.seg {
+  display: inline-flex;
+  background: var(--meja);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-2);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.seg button[aria-pressed='true'] {
+  background: #fff;
+  color: var(--tinta);
+  box-shadow: 0 1px 2px rgba(35, 43, 77, 0.14);
+}
+
+.pesan-galat {
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 12.5px;
+  color: #e14b4b;
 }
 
 .tabs {

@@ -83,7 +83,62 @@ const DEFINISI_BLOK = [
     nextStatement: null,
     colour: WARNA.suara,
   },
+  {
+    type: 'selamanya',
+    message0: 'ulangi selamanya',
+    message1: '%1',
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    previousStatement: null,
+    colour: WARNA.kontrol,
+    tooltip: 'Berjalan terus sampai tombol Berhenti ditekan. Aman walau isinya kosong.',
+  },
 ]
+
+// Konverter blok -> AST SEMENTARA, hanya untuk 8 blok contoh di atas, agar
+// milestone 1.3 (interpreter) bisa diuji dengan blok Blockly sungguhan.
+// Konverter penuh untuk 30 blok tingkat 2 adalah pekerjaan paket/blok di
+// milestone 1.4 dan akan menggantikan fungsi ini.
+function astSatuContoh(b) {
+  const f = (nm) => {
+    const v = parseFloat(b.getFieldValue(nm))
+    return Number.isNaN(v) ? 0 : v
+  }
+  switch (b.type) {
+    case 'maju':
+      return { t: 'maju', n: f('N'), id: b.id }
+    case 'putar_kanan':
+      return { t: 'putar', n: f('N'), id: b.id }
+    case 'pena':
+      return { t: 'pena', turun: b.getFieldValue('AKSI') === 'turun', id: b.id }
+    case 'katakan':
+      return { t: 'katakan', teks: b.getFieldValue('TEKS'), n: f('N'), id: b.id }
+    case 'ucapkan':
+      return { t: 'ucapkan', teks: b.getFieldValue('TEKS'), id: b.id }
+    case 'ulangi':
+      return { t: 'ulangi', n: Math.floor(f('N')), isi: astUrutanContoh(b.getInputTargetBlock('DO')), id: b.id }
+    case 'selamanya':
+      return { t: 'selamanya', isi: astUrutanContoh(b.getInputTargetBlock('DO')), id: b.id }
+    default:
+      return null
+  }
+}
+
+function astUrutanContoh(b) {
+  const out = []
+  while (b) {
+    if (!b.isEnabled || b.isEnabled()) {
+      const n = astSatuContoh(b)
+      if (n) out.push(n)
+    }
+    b = b.getNextBlock()
+  }
+  return out
+}
+
+export function programAstContoh(workspace) {
+  const bendera = workspace.getTopBlocks(true).find((b) => b.type === 'ketika_dijalankan')
+  return bendera ? astUrutanContoh(bendera.getNextBlock()) : []
+}
 
 export function daftarkanBlokContoh() {
   Blockly.common.defineBlocks(
@@ -101,7 +156,12 @@ export const TOOLBOX_CONTOH = {
       colour: WARNA.gerak,
       contents: [{ kind: 'block', type: 'maju' }, { kind: 'block', type: 'putar_kanan' }],
     },
-    { kind: 'category', name: 'Kontrol', colour: WARNA.kontrol, contents: [{ kind: 'block', type: 'ulangi' }] },
+    {
+      kind: 'category',
+      name: 'Kontrol',
+      colour: WARNA.kontrol,
+      contents: [{ kind: 'block', type: 'ulangi' }, { kind: 'block', type: 'selamanya' }],
+    },
     { kind: 'category', name: 'Pena', colour: WARNA.pena, contents: [{ kind: 'block', type: 'pena' }] },
     { kind: 'category', name: 'Tampilan', colour: WARNA.tampilan, contents: [{ kind: 'block', type: 'katakan' }] },
     { kind: 'category', name: 'Suara', colour: WARNA.suara, contents: [{ kind: 'block', type: 'ucapkan' }] },
