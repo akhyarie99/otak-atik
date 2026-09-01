@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
+Thumbs.db
+
+# Laravel (fase 4+)
+server/vendor/
+server/node_modules/
+server/.env
+server/storage/*.key

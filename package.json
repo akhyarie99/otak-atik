@@ -1,0 +1,13 @@
+{
+  "name": "otak-atik",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Platform belajar coding blok visual untuk sekolah Indonesia — monorepo.",
+  "workspaces": [
+    "editor",
+    "paket/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=editor"
+  }
+}

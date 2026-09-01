@@ -1,0 +1,8 @@
+{
+  "name": "@otak-atik/blok",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "Definisi blok, toolbox per tingkat, konversi blok ke AST."
+}

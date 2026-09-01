@@ -1,0 +1,8 @@
+{
+  "name": "@otak-atik/runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "Mesin: AST, interpreter, Game API, canvas. Tanpa Blockly, tanpa Vue. Dipakai editor dan pemutar."
+}
