@@ -3,13 +3,15 @@ import { onMounted, ref, shallowRef } from 'vue'
 import * as Blockly from 'blockly/core'
 import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
+import { Panggung } from '@otak-atik/runtime'
 import { daftarkanBlokContoh, TOOLBOX_CONTOH } from './blok-contoh'
 
 const kanvasBlok = ref(null)
-const panggung = ref(null)
+const kanvasPanggung = ref(null)
 const tabAktif = ref('json')
 const isiJson = ref('// Susun blok untuk melihat project.json di sini.')
 const workspace = shallowRef(null)
+const panggung = shallowRef(null)
 
 function simpanKeJson() {
   if (!workspace.value) return
@@ -33,6 +35,17 @@ onMounted(() => {
 
   workspace.value.addChangeListener(simpanKeJson)
   simpanKeJson()
+
+  panggung.value = new Panggung(kanvasPanggung.value)
+
+  // Milestone 1.2: Game API harus bisa dicoba langsung dari konsol.
+  // Dihapus lagi begitu interpreter (1.3) menjalankan panggung sendiri.
+  if (import.meta.env.DEV) {
+    window.panggung = panggung.value
+    console.info(
+      'Panggung siap diuji dari konsol, contoh: panggung.maju(80); panggung.putar(90)',
+    )
+  }
 })
 </script>
 
@@ -59,10 +72,10 @@ onMounted(() => {
         <section class="panel panel-panggung">
           <div class="panel-kepala">
             <span class="judul">Panggung</span>
-            <span class="ket">Diisi di milestone 1.2</span>
+            <span class="ket">Si Pensil, lapisan pena, dan pantulan tepi — dijalankan interpreter di milestone 1.3</span>
           </div>
           <div class="panggung-bungkus">
-            <canvas ref="panggung" width="480" height="360" role="img" aria-label="Panggung tempat si Pensil bergerak"></canvas>
+            <canvas ref="kanvasPanggung" width="480" height="360" role="img" aria-label="Panggung tempat si Pensil bergerak"></canvas>
           </div>
         </section>
 

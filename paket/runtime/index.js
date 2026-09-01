@@ -1,2 +1,4 @@
-// Diisi di milestone 1.2 (Game API dan panggung) dan 1.3 (AST dan interpreter).
-export {};
+export { Panggung, LEBAR_PANGGUNG, TINGGI_PANGGUNG } from './panggung.js'
+export { keLayar, pantulkanDiTepi, normalisasiSudut } from './geometri.js'
+
+// AST dan interpreter diisi di milestone 1.3.
