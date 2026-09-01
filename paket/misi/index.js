@@ -1,2 +1,2 @@
-// Diisi di milestone 2.1 (mesin misi): pemeriksa struktur (baca AST) dan pemeriksa hasil (jalankan lalu periksa keadaan).
-export {};
+export { hitungAst, cariAst, runTerpanjang, jalankanUntukPeriksa, periksaMisi } from './mesin.js'
+export { misiPersegi } from './misi-contoh.js'

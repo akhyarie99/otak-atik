@@ -4,5 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "main": "index.js",
-  "description": "Mesin misi dan pemeriksa dua lapis: struktur program dan hasil di panggung."
+  "description": "Mesin misi dan pemeriksa dua lapis: struktur AST dan hasil di panggung.",
+  "dependencies": {
+    "@otak-atik/runtime": "*"
+  }
 }
