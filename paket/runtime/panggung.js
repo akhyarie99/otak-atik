@@ -1,7 +1,7 @@
 // Game API dan panggung — milestone 1.2.
 // Tanpa Blockly, tanpa Vue. Editor DAN pemutar hasil ekspor memakai kelas
 // yang sama ini (aturan tetap #6): jangan menyalin logika ini ke tempat lain.
-import { keLayar, pantulkanDiTepi, normalisasiSudut } from './geometri.js'
+import { hexKeRgb, keLayar, normalisasiSudut, pantulkanDiTepi } from './geometri.js'
 
 // Aturan tetap: panggung selalu 480×360, diskalakan lewat CSS agar posisi
 // karya sama di semua layar.
@@ -22,12 +22,38 @@ export class Panggung {
     this.lapisPena.height = this.tinggi
     this.pctx = this.lapisPena.getContext('2d')
 
+    // Status tombol dilacak di sini (bukan di interpreter) supaya blok
+    // kondisi "tombol ditekan" bisa dibaca kapan saja, termasuk dari
+    // konsol, tanpa bergantung pada event handler paralel.
+    this.tombolDitekan = new Set()
+    this._pasangDengarTombol()
+
+    this._audioCtx = null
+
     this.aturUlang()
   }
 
+  _pasangDengarTombol() {
+    if (typeof window === 'undefined') return
+    window.addEventListener('keydown', (e) => this.tombolDitekan.add(e.key))
+    window.addEventListener('keyup', (e) => this.tombolDitekan.delete(e.key))
+  }
+
   aturUlang() {
-    this.sprite = { x: 0, y: 0, arah: 90, penaTurun: false, warna: WARNA_PENA_AWAL, tebal: 4, ucap: '' }
+    this.sprite = {
+      x: 0,
+      y: 0,
+      arah: 90,
+      penaTurun: false,
+      warna: WARNA_PENA_AWAL,
+      tebal: 4,
+      ucap: '',
+      tampak: true,
+      ukuran: 100,
+      kostum: 'pensil',
+    }
     this.statistik = { totalPutar: 0, pantul: 0, jarakTotal: 0 }
+    this.skor = null // {nama, nilai} — diatur lewat tampilkanSkor()
     this.pctx.clearRect(0, 0, this.lebar, this.tinggi)
     this.gambar()
   }
@@ -111,6 +137,90 @@ export class Panggung {
     }
   }
 
+  // --- Game API tambahan — milestone 1.4, dipakai blok gerak/tampilan/
+  //     suara/kondisi lanjutan. ---
+
+  arahkanKe(derajat) {
+    this.sprite.arah = normalisasiSudut(derajat)
+    this.gambar()
+  }
+
+  aturTampil(tampak) {
+    this.sprite.tampak = tampak
+    this.gambar()
+  }
+
+  gantiUkuran(persen) {
+    this.sprite.ukuran = Math.max(10, Math.min(400, persen))
+    this.gambar()
+  }
+
+  gantiKostum(nama) {
+    this.sprite.kostum = nama
+    this.gambar()
+  }
+
+  tampilkanSkor(nama, nilai) {
+    this.skor = { nama, nilai }
+    this.gambar()
+  }
+
+  sembunyikanSkor() {
+    this.skor = null
+    this.gambar()
+  }
+
+  apakahTombolDitekan(tombol) {
+    return this.tombolDitekan.has(tombol)
+  }
+
+  // Menyentuh warna: sampel piksel lapisan pena di posisi sprite sekarang,
+  // dibandingkan dengan warna target dalam toleransi kecil (anti-aliasing).
+  menyentuhWarna(warnaHex) {
+    const [px, py] = keLayar(this.sprite.x, this.sprite.y, this.lebar, this.tinggi)
+    const bx = Math.round(Math.max(0, Math.min(this.lebar - 1, px)))
+    const by = Math.round(Math.max(0, Math.min(this.tinggi - 1, py)))
+    let data
+    try {
+      data = this.pctx.getImageData(bx, by, 1, 1).data
+    } catch {
+      return false
+    }
+    if (data[3] === 0) return false // transparan = tidak ada goresan di sana
+    const target = hexKeRgb(warnaHex)
+    if (!target) return false
+    const jarak = Math.abs(data[0] - target.r) + Math.abs(data[1] - target.g) + Math.abs(data[2] - target.b)
+    return jarak < 60
+  }
+
+  // Model satu sprite (aturan tetap milestone 1.2). Sensor sprite-ke-sprite
+  // menunggu dukungan multi-sprite di fase lanjut — sengaja selalu false,
+  // bukan bug, supaya blok tetap bisa dipakai tanpa membingungkan anak.
+  menyentuhSprite() {
+    return false
+  }
+
+  mainkanBunyi(nama) {
+    const FREKUENSI = { pop: 660, ting: 990, kring: 440 }
+    const f = FREKUENSI[nama] ?? 660
+    try {
+      this._audioCtx = this._audioCtx || new (window.AudioContext || window.webkitAudioContext)()
+      const ctx = this._audioCtx
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.frequency.value = f
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.18)
+    } catch {
+      // Perangkat tanpa Web Audio, atau kebijakan autoplay memblokir —
+      // diamkan saja, jangan sampai menghentikan program anak.
+    }
+  }
+
   // --- Render. Dipanggil ulang otomatis di akhir tiap fungsi API di atas,
   //     sehingga hasilnya langsung terlihat tanpa perlu utas animasi
   //     terpisah — itu baru datang bersama interpreter di milestone 1.3. ---
@@ -150,7 +260,7 @@ export class Panggung {
     ctx.save()
     ctx.translate(p[0], p[1])
     ctx.rotate((sprite.arah * Math.PI) / 180)
-    const s = sprite.penaTurun ? 1 : 1.1
+    const s = (sprite.penaTurun ? 1 : 1.1) * (sprite.ukuran / 100)
     ctx.scale(s, s)
     if (!sprite.penaTurun) {
       ctx.save()
@@ -160,6 +270,24 @@ export class Panggung {
       ctx.ellipse(0, 6, 13, 5, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
+    }
+    if (sprite.kostum === 'bulat') {
+      ctx.fillStyle = sprite.warna
+      ctx.beginPath()
+      ctx.arc(0, -6, 16, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.beginPath()
+      ctx.arc(-4, -8, 3.4, 0, Math.PI * 2)
+      ctx.arc(4, -8, 3.4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#232B4D'
+      ctx.beginPath()
+      ctx.arc(-4, -8.6, 1.7, 0, Math.PI * 2)
+      ctx.arc(4, -8.6, 1.7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      return
     }
     ctx.fillStyle = '#E8C08A'
     ctx.beginPath()
@@ -218,12 +346,34 @@ export class Panggung {
     ctx.restore()
   }
 
+  gambarSkor() {
+    if (!this.skor) return
+    const { ctx } = this
+    const teks = `${this.skor.nama}: ${this.skor.nilai}`
+    ctx.save()
+    ctx.font = '700 13px "Baloo 2", sans-serif'
+    const w = ctx.measureText(teks).width + 20
+    ctx.fillStyle = 'rgba(35,43,77,0.85)'
+    if (ctx.roundRect) {
+      ctx.beginPath()
+      ctx.roundRect(10, 10, w, 26, 8)
+      ctx.fill()
+    } else {
+      ctx.fillRect(10, 10, w, 26)
+    }
+    ctx.fillStyle = '#fff'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(teks, 20, 23)
+    ctx.restore()
+  }
+
   gambar() {
     const { ctx, lebar: L, tinggi: T } = this
     ctx.clearRect(0, 0, L, T)
     this.gambarPetak()
     ctx.drawImage(this.lapisPena, 0, 0)
-    this.gambarSprite()
+    if (this.sprite.tampak) this.gambarSprite()
     this.gambarBalon()
+    this.gambarSkor()
   }
 }

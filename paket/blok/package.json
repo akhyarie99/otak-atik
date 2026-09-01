@@ -4,5 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "main": "index.js",
-  "description": "Definisi blok, toolbox per tingkat, konversi blok ke AST."
+  "description": "Definisi blok, toolbox per tingkat, konversi blok ke AST, generator kode JavaScript.",
+  "dependencies": {
+    "blockly": "^12.3.1"
+  }
 }

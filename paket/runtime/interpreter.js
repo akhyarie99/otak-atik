@@ -1,21 +1,37 @@
-// Interpreter AST — milestone 1.3.
+// Interpreter AST — milestone 1.3, diperluas di milestone 1.4.
 //
 // FORMAT AST — aturan tetap #3: daftar simpul ini hanya boleh DITAMBAH di
 // masa depan, tidak pernah diubah atau dihapus. Game yang sudah diekspor
 // harus tetap bisa diputar bertahun-tahun kemudian.
 //
-//   maju      {t:'maju',   n, id}         — panggung.maju(n)
-//   putar     {t:'putar',  n, id}         — panggung.putar(n); n negatif = kiri
-//   pergi     {t:'pergi',  x, y, id}      — panggung.pergiKe(x,y)
-//   pantul    {t:'pantul', id}            — panggung.pantulTepi()
-//   pena      {t:'pena',   turun, id}     — panggung.penaTurun(turun)
-//   warna     {t:'warna',  w, id}         — panggung.warnaPena(w)
-//   hapus     {t:'hapus',  id}            — panggung.hapusGambar()
-//   katakan   {t:'katakan',teks, n, id}   — balon bicara selama n detik
-//   ucapkan   {t:'ucapkan',teks, id}      — TTS, tunggu sampai selesai/6 detik
-//   tunggu    {t:'tunggu', n, id}         — jeda n detik
-//   ulangi    {t:'ulangi', n, isi, id}    — ulangi isi sebanyak n kali
-//   selamanya {t:'selamanya', isi, id}    — ulangi isi selamanya
+//   maju        {t:'maju',   n, id}              — panggung.maju(n)
+//   putar       {t:'putar',  n, id}               — panggung.putar(n); n negatif = kiri
+//   arahkan     {t:'arahkan', n, id}               — panggung.arahkanKe(n)
+//   pergi       {t:'pergi',  x, y, id}             — panggung.pergiKe(x,y)
+//   pantul      {t:'pantul', id}                   — panggung.pantulTepi()
+//   pena        {t:'pena',   turun, id}            — panggung.penaTurun(turun)
+//   warna       {t:'warna',  w, id}                — panggung.warnaPena(w)
+//   hapus       {t:'hapus',  id}                   — panggung.hapusGambar()
+//   katakan     {t:'katakan',teks, n, id}          — balon bicara selama n detik
+//   ucapkan     {t:'ucapkan',teks, id}             — TTS, tunggu sampai selesai/6 detik
+//   tunggu      {t:'tunggu', n, id}                — jeda n detik
+//   ulangi      {t:'ulangi', n, isi, id}           — ulangi isi sebanyak n kali
+//   selamanya   {t:'selamanya', isi, id}           — ulangi isi selamanya
+//   jika        {t:'jika', kondisi, isi, id}       — jalankan isi bila kondisi benar
+//   jika_lain   {t:'jika_lain', kondisi, isi, isiLain, id}
+//   atur_tampil {t:'atur_tampil', tampak, id}      — panggung.aturTampil(tampak)
+//   ukuran      {t:'ukuran', n, id}                — panggung.gantiUkuran(n)
+//   kostum      {t:'kostum', nama, id}             — panggung.gantiKostum(nama)
+//   bunyi       {t:'bunyi', nama, id}              — panggung.mainkanBunyi(nama)
+//   var_atur    {t:'var_atur', nama, n, id}        — set variabel = n
+//   var_ubah    {t:'var_ubah', nama, n, id}        — variabel += n
+//   var_tampil  {t:'var_tampil', nama, id}         — tampilkan skor variabel
+//
+//   Simpul KONDISI (nilai boolean, dipakai di dalam jika/jika_lain, tidak
+//   pernah berdiri sendiri di urutan statement):
+//   menyentuh_warna  {t:'menyentuh_warna', w, id}
+//   menyentuh_sprite {t:'menyentuh_sprite', id}
+//   tombol_ditekan   {t:'tombol_ditekan', tombol, id}
 //
 // PENGAMAN LOOP — aturan tetap #1: "ulangi" dan "selamanya" WAJIB yield di
 // setiap putaran, sebelum menjalankan isinya, walau isinya kosong. Itu
@@ -29,11 +45,27 @@ function* jeda(ms, id) {
   while (performance.now() < sampai) yield { tipe: 'tunggu', id }
 }
 
-export function* jalankanUrutan(list, panggung) {
-  for (const n of list || []) yield* jalankanSatu(n, panggung)
+// Simpul kondisi dievaluasi langsung (bukan generator) — dianggap satu
+// langkah atomik seperti reporter block di Scratch, tidak yield sendiri.
+export function evalKondisi(n, panggung) {
+  if (!n) return false
+  switch (n.t) {
+    case 'menyentuh_warna':
+      return panggung.menyentuhWarna(n.w)
+    case 'menyentuh_sprite':
+      return panggung.menyentuhSprite()
+    case 'tombol_ditekan':
+      return panggung.apakahTombolDitekan(n.tombol)
+    default:
+      return false
+  }
 }
 
-export function* jalankanSatu(n, panggung) {
+export function* jalankanUrutan(list, panggung, vars) {
+  for (const n of list || []) yield* jalankanSatu(n, panggung, vars)
+}
+
+export function* jalankanSatu(n, panggung, vars = new Map()) {
   switch (n.t) {
     case 'maju':
       panggung.maju(n.n)
@@ -41,6 +73,10 @@ export function* jalankanSatu(n, panggung) {
       break
     case 'putar':
       panggung.putar(n.n)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'arahkan':
+      panggung.arahkanKe(n.n)
       yield { tipe: 'langkah', id: n.id }
       break
     case 'pergi':
@@ -88,15 +124,52 @@ export function* jalankanSatu(n, panggung) {
     case 'ulangi':
       for (let i = 0; i < n.n; i++) {
         yield { tipe: 'langkah', id: n.id }
-        yield* jalankanUrutan(n.isi, panggung)
+        yield* jalankanUrutan(n.isi, panggung, vars)
       }
       break
     case 'selamanya':
       while (true) {
         yield { tipe: 'langkah', id: n.id }
-        yield* jalankanUrutan(n.isi, panggung)
+        yield* jalankanUrutan(n.isi, panggung, vars)
       }
     // eslint-disable-next-line no-fallthrough -- selamanya tidak pernah selesai sendiri
+    case 'jika':
+      yield { tipe: 'langkah', id: n.id }
+      if (evalKondisi(n.kondisi, panggung)) yield* jalankanUrutan(n.isi, panggung, vars)
+      break
+    case 'jika_lain':
+      yield { tipe: 'langkah', id: n.id }
+      if (evalKondisi(n.kondisi, panggung)) yield* jalankanUrutan(n.isi, panggung, vars)
+      else yield* jalankanUrutan(n.isiLain, panggung, vars)
+      break
+    case 'atur_tampil':
+      panggung.aturTampil(n.tampak)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'ukuran':
+      panggung.gantiUkuran(n.n)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'kostum':
+      panggung.gantiKostum(n.nama)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'bunyi':
+      panggung.mainkanBunyi(n.nama)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'var_atur':
+      vars.set(n.nama, n.n)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'var_ubah':
+      vars.set(n.nama, (vars.get(n.nama) || 0) + n.n)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'var_tampil':
+      panggung.tampilkanSkor(n.nama, vars.get(n.nama) ?? 0)
+      yield { tipe: 'langkah', id: n.id }
+      break
     default:
       yield { tipe: 'langkah', id: n.id }
   }
@@ -127,7 +200,9 @@ export class Interpreter {
   mulai(programAst) {
     this.berhenti()
     this.panggung.aturUlang()
-    this.utas = jalankanUrutan(programAst, this.panggung)
+    this.panggung.sembunyikanSkor()
+    this.vars = new Map()
+    this.utas = jalankanUrutan(programAst, this.panggung, this.vars)
     this.jalan = true
     this._frameId = requestAnimationFrame(this._detak)
   }

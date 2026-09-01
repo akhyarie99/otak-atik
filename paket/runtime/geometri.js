@@ -46,3 +46,12 @@ export function pantulkanDiTepi({ x, y, arah }, lebar, tinggi, marginSprite = 22
 
   return { x: nx, y: ny, arah: narah, kena }
 }
+
+// Dipakai sensor "menyentuh warna". Menerima "#RRGGBB"; mengembalikan null
+// untuk masukan yang tidak valid supaya pemanggil bisa menolaknya dengan aman.
+export function hexKeRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim())
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}

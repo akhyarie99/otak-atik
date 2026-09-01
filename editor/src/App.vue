@@ -4,12 +4,13 @@ import * as Blockly from 'blockly/core'
 import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
 import { Interpreter, Panggung } from '@otak-atik/runtime'
-import { daftarkanBlokContoh, programAstContoh, TOOLBOX_CONTOH } from './blok-contoh'
+import { daftarkanBlok, kodeProgram, programAst as bangunProgramAst, TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
 const tabAktif = ref('json')
 const isiJson = ref('// Susun blok untuk melihat project.json di sini.')
+const isiKode = ref('// Susun blok untuk melihat kode JavaScript di sini.')
 const workspace = shallowRef(null)
 const panggung = shallowRef(null)
 const interpreter = shallowRef(null)
@@ -21,6 +22,7 @@ function simpanKeJson() {
   if (!workspace.value) return
   const data = Blockly.serialization.workspaces.save(workspace.value)
   isiJson.value = JSON.stringify(data, null, 2)
+  isiKode.value = kodeProgram(bangunProgramAst(workspace.value))
 }
 
 function sorotBlok(id) {
@@ -32,13 +34,13 @@ function sorotBlok(id) {
 }
 
 function jalankan() {
-  const bendera = workspace.value.getTopBlocks(true).find((b) => b.type === 'ketika_dijalankan')
+  const bendera = workspace.value.getTopBlocks(true).find((b) => b.type === 'ketika_bendera')
   if (!bendera) {
     pesanJalan.value = 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
     return
   }
   pesanJalan.value = ''
-  const programAst = programAstContoh(workspace.value)
+  const programAst = bangunProgramAst(workspace.value)
   interpreter.value.aturKecepatan(kecepatan.value)
   interpreter.value.mulai(programAst)
   sedangJalan.value = true
@@ -56,10 +58,10 @@ function ubahKecepatan(nama) {
 
 onMounted(() => {
   Blockly.setLocale(LokalId)
-  daftarkanBlokContoh()
+  daftarkanBlok()
 
   workspace.value = Blockly.inject(kanvasBlok.value, {
-    toolbox: TOOLBOX_CONTOH,
+    toolbox: TOOLBOX_TINGKAT_2,
     renderer: 'zelos',
     trashcan: true,
     sounds: false,
@@ -161,7 +163,7 @@ onMounted(() => {
               project.json
             </button>
           </div>
-          <pre v-if="tabAktif === 'js'" class="kode">// Generator kode diisi di milestone 1.4.</pre>
+          <pre v-if="tabAktif === 'js'" class="kode">{{ isiKode }}</pre>
           <pre v-else class="kode">{{ isiJson }}</pre>
         </section>
       </div>
