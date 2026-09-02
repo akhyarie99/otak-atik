@@ -19,6 +19,19 @@ export const WARNA = {
   suara: '#EE6C2B',
 }
 
+// field_colour BUKAN bagian dari blockly/core lagi (dipindah ke plugin
+// terpisah @blockly/field-colour sejak Blockly modern) — dropdown warna
+// bernama ini menghindari dependensi baru DAN lebih ramah anak SD
+// daripada palet warna mentah (sama seperti pendekatan prototipe rujukan).
+export const PALET_WARNA = [
+  ['biru', '#2F6FED'],
+  ['merah', '#E14B4B'],
+  ['hijau', '#12A472'],
+  ['kuning', '#F5B32E'],
+  ['ungu', '#7A4FD1'],
+  ['hitam', '#232B4D'],
+]
+
 export const TOMBOL = [
   ['panah atas', 'ArrowUp'],
   ['panah bawah', 'ArrowDown'],
@@ -161,7 +174,7 @@ export const DEFINISI_BLOK = [
   {
     type: 'menyentuh_warna',
     message0: 'menyentuh warna %1',
-    args0: [{ type: 'field_colour', name: 'W', colour: '#E14B4B' }],
+    args0: [{ type: 'field_dropdown', name: 'W', options: PALET_WARNA }],
     output: 'Boolean',
     colour: WARNA.kontrol,
   },
@@ -233,7 +246,7 @@ export const DEFINISI_BLOK = [
   {
     type: 'warna_pena',
     message0: 'warna pena %1',
-    args0: [{ type: 'field_colour', name: 'W', colour: WARNA.gerak }],
+    args0: [{ type: 'field_dropdown', name: 'W', options: PALET_WARNA }],
     previousStatement: null,
     nextStatement: null,
     colour: WARNA.pena,

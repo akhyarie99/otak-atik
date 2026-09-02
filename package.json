@@ -8,10 +8,13 @@
     "paket/*"
   ],
   "scripts": {
+    "predev": "npm run build:pemutar",
     "dev": "npm run dev --workspace=editor",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:pemutar": "node pemutar/build.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "vitest": "^3.0.0"
   }
 }

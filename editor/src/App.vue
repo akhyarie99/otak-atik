@@ -6,9 +6,15 @@ import 'blockly/blocks'
 import { Interpreter, Panggung } from '@otak-atik/runtime'
 import { daftarkanBlok, kodeProgram, programAst as bangunProgramAst, TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
 import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
+import { bacaBerkasProjek, muatProjek, simpanProjek } from './berkas'
+import { unduhEksporHtml } from './ekspor'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
+const berkasMasuk = ref(null)
+const pesanBerkas = ref(
+  'Projek tersimpan sebagai .json. Game hasil ekspor berupa satu berkas .html yang bisa dibuka tanpa internet.',
+)
 const tabAktif = ref('json')
 const isiJson = ref('// Susun blok untuk melihat project.json di sini.')
 const isiKode = ref('// Susun blok untuk melihat kode JavaScript di sini.')
@@ -43,6 +49,40 @@ function periksaMisiSekarang() {
 function muatTemplat(templat) {
   Blockly.serialization.workspaces.load(templat.blockly, workspace.value)
   hasilPeriksa.value = null
+}
+
+function klikSimpan() {
+  const ukuran = simpanProjek(workspace.value)
+  pesanBerkas.value = `Projek tersimpan (${(ukuran / 1024).toFixed(1)} KB).`
+}
+
+function klikBuka() {
+  berkasMasuk.value.click()
+}
+
+async function berkasDipilih(e) {
+  const file = e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  try {
+    const data = await bacaBerkasProjek(file)
+    muatProjek(data, workspace.value)
+    hasilPeriksa.value = null
+    pesanBerkas.value = `Projek "${file.name}" berhasil dibuka.`
+  } catch (err) {
+    pesanBerkas.value = err.message
+  }
+}
+
+function klikEkspor() {
+  const programAst = bangunProgramAst(workspace.value)
+  const judul = misiAktif.value?.judul || 'Karyaku'
+  const { ukuran } = unduhEksporHtml(programAst, judul)
+  const kb = (ukuran / 1024).toFixed(2)
+  pesanBerkas.value =
+    ukuran < 15 * 1024
+      ? `Game diekspor: ${kb} KB (di bawah 15 KB). Buka berkasnya langsung tanpa internet.`
+      : `Game diekspor: ${kb} KB — di atas target 15 KB, program ini cukup besar.`
 }
 
 function simpanKeJson() {
@@ -209,6 +249,13 @@ onMounted(() => {
             </div>
           </div>
           <p v-if="pesanJalan" class="pesan-galat">{{ pesanJalan }}</p>
+          <div class="berkas">
+            <button class="tbl kecil" @click="klikSimpan">Simpan projek</button>
+            <button class="tbl kecil hantu" @click="klikBuka">Buka projek</button>
+            <button class="tbl kecil" style="background: #ee6c2b" @click="klikEkspor">Ekspor jadi game</button>
+            <input ref="berkasMasuk" type="file" accept=".json,application/json" hidden @change="berkasDipilih" />
+            <span class="pesan">{{ pesanBerkas }}</span>
+          </div>
         </section>
 
         <section class="panel panel-kode">
@@ -522,6 +569,20 @@ canvas {
   background: #fff;
   color: var(--tinta);
   box-shadow: 0 1px 2px rgba(35, 43, 77, 0.14);
+}
+
+.berkas {
+  padding: 11px 14px;
+  border-top: 1px solid var(--garis);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.berkas .pesan {
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  flex-basis: 100%;
 }
 
 .pesan-galat {

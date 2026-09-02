@@ -74,6 +74,17 @@ describe('kelengkapan blok tingkat 2 (milestone 1.4)', () => {
     expect(kodeUrutan([selamanya], 0)).toContain('while (true)')
   })
 
+  it('tidak ada blok memakai field_colour (bukan bagian blockly/core — lihat milestone 2.3)', () => {
+    const semuaArgs = DEFINISI_BLOK.flatMap((d) => [
+      ...(d.args0 || []),
+      ...(d.args1 || []),
+      ...(d.args2 || []),
+      ...(d.args3 || []),
+    ])
+    const pakaiFieldColour = semuaArgs.filter((a) => a.type === 'field_colour')
+    expect(pakaiFieldColour, 'pakai field_dropdown dengan PALET_WARNA sebagai gantinya').toEqual([])
+  })
+
   it('jika/jika_lain menghasilkan if/else dengan kondisi dari blok kondisi', () => {
     const bJika = blokTiruan('jika', FIELDS_CONTOH)
     bJika.getInputTargetBlock = (nm) => (nm === 'KONDISI' ? blokTiruan('tombol_ditekan', FIELDS_CONTOH) : null)
