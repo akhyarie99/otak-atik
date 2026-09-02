@@ -27,6 +27,10 @@ function tampilkanKembali(karyaId) {
     router.post(route('karya.tampilkan', karyaId), {}, { preserveScroll: true });
 }
 
+function remix(karyaId) {
+    router.post(route('galeri.remix', karyaId));
+}
+
 function promosikan(karyaId) {
     router.post(route('karya.promosikan', karyaId), {}, { preserveScroll: true });
 }
@@ -95,7 +99,9 @@ function batalTerbitkan(karyaId) {
                                 </a>
                                 <p class="text-xs text-gray-500">
                                     oleh {{ k.pembuat }} · {{ k.jumlah_reaksi }} reaksi
-                                    <span v-if="k.remix_dari">· remix</span>
+                                </p>
+                                <p v-if="k.rantai_remix" class="text-xs text-indigo-500">
+                                    remix dari karya asal "{{ k.rantai_remix[0].judul }}" oleh {{ k.rantai_remix[0].pembuat }}
                                 </p>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
@@ -106,6 +112,13 @@ function batalTerbitkan(karyaId) {
                                     class="rounded-md bg-gray-100 px-2 py-1 text-xs hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200"
                                 >
                                     {{ r.label }}
+                                </button>
+                                <button
+                                    v-if="!isGuru"
+                                    @click="remix(k.id)"
+                                    class="rounded-md bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-200"
+                                >
+                                    Remix
                                 </button>
                                 <button
                                     v-if="isGuru && tab === 'kelas' && k.status_publikasi === 'kelas'"

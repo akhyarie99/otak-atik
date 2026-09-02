@@ -121,6 +121,89 @@ class GaleriTest extends TestCase
         $resp->assertNotFound();
     }
 
+    // --- Milestone 5.2 — remix (PRD 6.6): "Anak bisa remix: menyalin
+    // karya teman untuk dimodifikasi, dengan atribusi otomatis ke
+    // pembuat asli." "Selesai bila": rantai remix terlacak sampai
+    // karya asal, sekalipun sudah remix-dari-remix beberapa lapis.
+
+    public function test_remix_membuat_karya_baru_milik_peremix_dengan_atribusi_ke_pembuat_asli(): void
+    {
+        [$sekolah, , , $kelas] = $this->sekolahDenganKelas();
+        $penulisAsli = $this->siswaDiKelas($sekolah, $kelas, 'Ani');
+        $asal = $this->karyaMilik($sekolah, $penulisAsli, 'Kereta Warna-Warni', 'kelas');
+
+        $peremix = $this->siswaDiKelas($sekolah, $kelas, 'Budi');
+        $this->loginSebagai($peremix->user, $peremix);
+        $resp = $this->post("/galeri/{$asal->id}/remix");
+
+        $resp->assertRedirect(route('editor'));
+        $this->assertDatabaseCount('karya', 2);
+
+        $remix = Karya::where('keanggotaan_id', $peremix->id)->first();
+        $this->assertNotNull($remix);
+        $this->assertSame($asal->id, $remix->remix_dari_karya_id);
+        $this->assertSame($asal->project_json, $remix->project_json);
+        $this->assertSame('privat', $remix->status_publikasi);
+
+        // Karya asal Ani tidak berubah sama sekali oleh aksi remix Budi.
+        $this->assertSame('kelas', $asal->fresh()->status_publikasi);
+        $this->assertSame($penulisAsli->id, $asal->fresh()->keanggotaan_id);
+    }
+
+    public function test_rantai_remix_terlacak_sampai_karya_asal_walau_berlapis(): void
+    {
+        [$sekolah, , , $kelas] = $this->sekolahDenganKelas();
+        $ani = $this->siswaDiKelas($sekolah, $kelas, 'Ani');
+        $asal = $this->karyaMilik($sekolah, $ani, 'Karya Asal', 'kelas');
+
+        $budi = $this->siswaDiKelas($sekolah, $kelas, 'Budi');
+        $this->loginSebagai($budi->user, $budi);
+        $this->post("/galeri/{$asal->id}/remix")->assertRedirect();
+        $remixBudi = Karya::where('keanggotaan_id', $budi->id)->first();
+        $remixBudi->update(['status_publikasi' => 'kelas']); // Budi menerbitkan remix-nya juga
+
+        $citra = $this->siswaDiKelas($sekolah, $kelas, 'Citra');
+        $this->loginSebagai($citra->user, $citra);
+        $this->post("/galeri/{$remixBudi->id}/remix")->assertRedirect();
+        $remixCitra = Karya::where('keanggotaan_id', $citra->id)->first();
+
+        // Remix-dari-remix: induk langsung Citra adalah karya Budi,
+        // tapi rantainya tetap terlacak sampai karya asal milik Ani.
+        $rantai = $remixCitra->rantaiRemix();
+        $this->assertSame([$asal->id, $remixBudi->id, $remixCitra->id], $rantai->pluck('id')->all());
+        $this->assertSame($asal->id, $rantai->first()->id);
+        $this->assertSame('Ani', $rantai->first()->keanggotaan->user->nama_panggilan);
+    }
+
+    public function test_remix_karya_privat_ditolak(): void
+    {
+        [$sekolah, , , $kelas] = $this->sekolahDenganKelas();
+        $penulis = $this->siswaDiKelas($sekolah, $kelas, 'Ani');
+        $karya = $this->karyaMilik($sekolah, $penulis, 'Rahasia', 'privat');
+
+        $peremix = $this->siswaDiKelas($sekolah, $kelas, 'Budi');
+        $this->loginSebagai($peremix->user, $peremix);
+        $resp = $this->post("/galeri/{$karya->id}/remix");
+
+        $resp->assertNotFound();
+        $this->assertDatabaseCount('karya', 1);
+    }
+
+    public function test_remix_lewat_id_karya_sekolah_lain_ditolak(): void
+    {
+        [$sekolahA, , , $kelasA] = $this->sekolahDenganKelas();
+        $penulis = $this->siswaDiKelas($sekolahA, $kelasA, 'Ani');
+        $karya = $this->karyaMilik($sekolahA, $penulis, 'Punya Sekolah A', 'sekolah');
+
+        [$sekolahB, , , $kelasB] = $this->sekolahDenganKelas();
+        $siswaB = $this->siswaDiKelas($sekolahB, $kelasB, 'Citra');
+        $this->loginSebagai($siswaB->user, $siswaB);
+
+        $resp = $this->post("/galeri/{$karya->id}/remix");
+
+        $resp->assertNotFound();
+    }
+
     public function test_galeri_kelas_hanya_berisi_karya_teman_sekelas_yang_terbit(): void
     {
         [$sekolah, $guru, $keanggotaanGuru, $kelasA] = $this->sekolahDenganKelas();

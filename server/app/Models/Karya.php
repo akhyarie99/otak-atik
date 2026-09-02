@@ -59,4 +59,20 @@ class Karya extends Model
     {
         return $this->status_publikasi !== 'privat' && ! $this->disembunyikan_oleh_guru;
     }
+
+    // Rantai remix dari karya asal (paling awal) sampai karya ini
+    // sendiri (milestone 5.2 — "Rantai remix terlacak sampai karya
+    // asal"). remix_dari_karya_id memakai nullOnDelete, jadi rantai
+    // otomatis terpotong rapi kalau satu leluhurnya sudah terhapus.
+    public function rantaiRemix(): \Illuminate\Support\Collection
+    {
+        $rantai = collect([$this]);
+        $sekarang = $this;
+        while ($sekarang->remixDari) {
+            $sekarang = $sekarang->remixDari;
+            $rantai->prepend($sekarang);
+        }
+
+        return $rantai;
+    }
 }

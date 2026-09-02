@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\DB;
 // koneksi. Konflik diselesaikan dengan tulisan terakhir menang, dengan
 // riwayat versi yang bisa dikembalikan."
 //
-// "Karya" di sini SATU per keanggotaan (MVP) — cukup untuk membuktikan
-// mekanisme sinkron/versi/konflik; banyak karya per siswa adalah
-// perluasan lanjutan, bukan yang diuji milestone ini.
+// Sejak milestone 5.2 (remix), satu keanggotaan bisa punya LEBIH dari
+// satu baris karya (karya sendiri + salinan remix). Editor tetap
+// menyunting SATU "karya aktif" per keanggotaan — di sini didefinisikan
+// sebagai yang client_updated_at-nya paling baru, supaya remix baru
+// otomatis jadi yang terbuka berikutnya tanpa editor perlu tahu ID-nya.
 class KaryaController extends Controller
 {
     private function keanggotaanId(Request $request): int
@@ -23,9 +25,16 @@ class KaryaController extends Controller
         return $request->attributes->get('keanggotaan_aktif')->id;
     }
 
+    // Karya "aktif" = yang paling baru diubah. Query dasar dipakai ulang
+    // di semua metode di bawah supaya definisinya satu tempat saja.
+    private function queryKaryaAktif(int $keanggotaanId)
+    {
+        return Karya::where('keanggotaan_id', $keanggotaanId)->latest('client_updated_at');
+    }
+
     public function tampilkan(Request $request)
     {
-        $karya = Karya::where('keanggotaan_id', $this->keanggotaanId($request))->first();
+        $karya = $this->queryKaryaAktif($this->keanggotaanId($request))->first();
 
         // 204 kalau belum ada karya — SENGAJA bukan response()->json(null),
         // yang di Laravel/Symfony menghasilkan body "{}" (objek kosong),
@@ -46,7 +55,7 @@ class KaryaController extends Controller
         $waktuKlien = Carbon::parse($data['client_updated_at']);
 
         $karya = DB::transaction(function () use ($request, $data, $keanggotaanId, $waktuKlien) {
-            $karya = Karya::where('keanggotaan_id', $keanggotaanId)->lockForUpdate()->first();
+            $karya = $this->queryKaryaAktif($keanggotaanId)->lockForUpdate()->first();
 
             if (! $karya) {
                 $karya = Karya::create([
@@ -89,7 +98,7 @@ class KaryaController extends Controller
 
     public function versi(Request $request)
     {
-        $karya = Karya::where('keanggotaan_id', $this->keanggotaanId($request))->firstOrFail();
+        $karya = $this->queryKaryaAktif($this->keanggotaanId($request))->firstOrFail();
 
         return response()->json(
             $karya->versi()->get(['id', 'client_updated_at', 'created_at'])
@@ -98,7 +107,7 @@ class KaryaController extends Controller
 
     public function pulihkan(Request $request, KaryaVersi $versi)
     {
-        $karya = Karya::where('keanggotaan_id', $this->keanggotaanId($request))->firstOrFail();
+        $karya = $this->queryKaryaAktif($this->keanggotaanId($request))->firstOrFail();
 
         // {versi} diikat implisit lewat ID saja (KaryaVersi tidak
         // tersaring TenantScope langsung) — verifikasi manual di sini

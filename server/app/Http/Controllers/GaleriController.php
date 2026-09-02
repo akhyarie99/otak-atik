@@ -28,15 +28,29 @@ class GaleriController extends Controller
 
     private function format($karya): array
     {
-        return $karya->map(fn (Karya $k) => [
-            'id' => $k->id,
-            'judul' => $k->judul,
-            'pembuat' => $k->keanggotaan->user->nama_panggilan ?? $k->keanggotaan->user->name,
-            'status_publikasi' => $k->status_publikasi,
-            'dipublikasikan_pada' => $k->dipublikasikan_pada?->toIso8601String(),
-            'jumlah_reaksi' => $k->reaksi_count ?? $k->reaksi()->count(),
-            'remix_dari' => $k->remix_dari_karya_id,
-        ])->values()->all();
+        return $karya->map(function (Karya $k) {
+            // Rantai penuh sampai karya asal — bukan cuma induk langsung
+            // — supaya atribusi "dibuat dari karya X oleh Y" tetap benar
+            // walau sudah remix-dari-remix beberapa lapis (PRD 6.6).
+            $rantai = $k->remix_dari_karya_id
+                ? $k->rantaiRemix()->map(fn (Karya $r) => [
+                    'id' => $r->id,
+                    'judul' => $r->judul,
+                    'pembuat' => $r->keanggotaan->user->nama_panggilan ?? $r->keanggotaan->user->name,
+                ])->values()->all()
+                : null;
+
+            return [
+                'id' => $k->id,
+                'judul' => $k->judul,
+                'pembuat' => $k->keanggotaan->user->nama_panggilan ?? $k->keanggotaan->user->name,
+                'status_publikasi' => $k->status_publikasi,
+                'dipublikasikan_pada' => $k->dipublikasikan_pada?->toIso8601String(),
+                'jumlah_reaksi' => $k->reaksi_count ?? $k->reaksi()->count(),
+                'remix_dari' => $k->remix_dari_karya_id,
+                'rantai_remix' => $rantai,
+            ];
+        })->values()->all();
     }
 
     public function index(Request $request): Response
@@ -101,6 +115,30 @@ class GaleriController extends Controller
             'motorJs' => $motorJs,
             'programJson' => json_encode($karya->project_json),
         ]);
+    }
+
+    // Salin karya teman untuk dimodifikasi, atribusi otomatis ke pembuat
+    // asli lewat remix_dari_karya_id (milestone 5.2, PRD 6.6). Hasil
+    // remix mulai privat — anak boleh utak-atik dulu sebelum menerbitkan.
+    public function remix(Request $request, Karya $karya): \Illuminate\Http\RedirectResponse
+    {
+        abort_unless($karya->terlihat(), 404);
+
+        $keanggotaan = $this->keanggotaanAktif($request);
+
+        $remix = Karya::create([
+            'keanggotaan_id' => $keanggotaan->id,
+            'judul' => $karya->judul,
+            'project_json' => $karya->project_json,
+            'client_updated_at' => now(),
+            'status_publikasi' => 'privat',
+            'remix_dari_karya_id' => $karya->id,
+        ]);
+
+        // client_updated_at terbaru => editor (yang selalu memuat karya
+        // TERBARU milik keanggotaan aktif, lihat KaryaController) langsung
+        // membuka hasil remix ini saat dibuka berikutnya.
+        return redirect()->route('editor');
     }
 
     public function terbitkan(Request $request, Karya $karya): \Illuminate\Http\RedirectResponse

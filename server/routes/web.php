@@ -61,6 +61,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri.index');
     Route::get('/galeri/{karya}/mainkan', [GaleriController::class, 'mainkan'])->name('galeri.mainkan');
+    Route::post('/galeri/{karya}/remix', [GaleriController::class, 'remix'])->name('galeri.remix');
     Route::post('/karya/{karya}/terbitkan', [GaleriController::class, 'terbitkan'])->name('karya.terbitkan');
     Route::post('/karya/{karya}/promosikan-sekolah', [GaleriController::class, 'promosikanSekolah'])->name('karya.promosikan');
     Route::post('/karya/{karya}/sembunyikan', [GaleriController::class, 'sembunyikan'])->name('karya.sembunyikan');
