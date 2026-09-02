@@ -15,6 +15,10 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Editor Blockly (Vite, npm workspace terpisah dari server/ ini)
+    // dibuka lewat iframe dari halaman /editor — lihat milestone 4.3.
+    'editor_url' => env('EDITOR_URL', 'http://localhost:5183'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

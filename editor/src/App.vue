@@ -13,10 +13,12 @@ import {
   TOOLBOX_TINGKAT_2,
 } from '@otak-atik/blok'
 import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
-import { bacaBerkasProjek, muatProjek, simpanProjek } from './berkas'
+import { bacaBerkasProjek, berkasProjek, muatProjek, simpanProjek } from './berkas'
 import { unduhEksporHtml } from './ekspor'
 import ModeKartu from './ModeKartu.vue'
 import { kuncilLanskapUntukBermain, lepasKunciLanskap } from './orientasi'
+import { bacaLokal, simpanLokal } from './simpanLokal'
+import { daftarVersi, dorongKeAwan, konfigurasiSinkron, pulihkanVersi, siapSinkron, tarikDariAwan } from './sinkronAwan'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -26,6 +28,8 @@ const berkasMasuk = ref(null)
 const pesanBerkas = ref(
   'Projek tersimpan sebagai .json. Game hasil ekspor berupa satu berkas .html yang bisa dibuka tanpa internet.',
 )
+const statusSimpan = ref('') // status autosave lokal/awan — milestone 4.3
+const daftarVersiTampil = ref(null) // null = panel tertutup
 const tabAktif = ref('json')
 const isiJson = ref('// Susun blok untuk melihat project.json di sini.')
 const isiKode = ref('// Susun blok untuk melihat kode JavaScript di sini.')
@@ -180,7 +184,67 @@ function ubahKecepatan(nama) {
   if (interpreter.value) interpreter.value.aturKecepatan(nama)
 }
 
-onMounted(() => {
+// --- Autosave lokal + sinkron awan — milestone 4.3 ---
+
+let waktuAutosave = null
+function jadwalkanAutosave() {
+  clearTimeout(waktuAutosave)
+  waktuAutosave = setTimeout(autosaveSekarang, 1500)
+}
+
+async function autosaveSekarang() {
+  const project = berkasProjek(workspace.value)
+  const waktu = new Date().toISOString()
+  await simpanLokal(project, waktu)
+  statusSimpan.value = 'Tersimpan di perangkat ini.'
+
+  if (!siapSinkron()) return
+  try {
+    const hasil = await dorongKeAwan(project, waktu)
+    if (hasil && new Date(hasil.client_updated_at) > new Date(waktu)) {
+      // Server menang (ada tulisan lain yang lebih baru, mis. dari
+      // perangkat lain) — samakan editor ini ke keadaan itu supaya
+      // tidak diam-diam berbeda dari yang tersimpan.
+      muatProjek(hasil.project, workspace.value)
+      await simpanLokal(hasil.project, hasil.client_updated_at)
+      statusSimpan.value = 'Disamakan dengan versi terbaru dari perangkat lain.'
+    } else {
+      statusSimpan.value = 'Tersinkron ke awan · ' + new Date(waktu).toLocaleTimeString('id-ID')
+    }
+  } catch (e) {
+    statusSimpan.value = 'Belum tersinkron (luring): ' + e.message
+  }
+}
+
+async function sinkronSaatMulai(lokal) {
+  try {
+    const server = await tarikDariAwan()
+    if (server && (!lokal || new Date(server.client_updated_at) > new Date(lokal.clientUpdatedAt))) {
+      muatProjek(server.project, workspace.value)
+      await simpanLokal(server.project, server.client_updated_at)
+      statusSimpan.value = 'Karya dimuat dari awan (versi terbaru).'
+    } else if (lokal) {
+      await dorongKeAwan(lokal.project, lokal.clientUpdatedAt)
+      statusSimpan.value = 'Karya lokal disinkronkan ke awan.'
+    }
+  } catch (e) {
+    statusSimpan.value = 'Sinkron awal gagal (luring?): ' + e.message
+  }
+}
+
+async function bukaRiwayatVersi() {
+  daftarVersiTampil.value = await daftarVersi()
+}
+
+async function pulihkanKeVersi(idVersi) {
+  const hasil = await pulihkanVersi(idVersi)
+  muatProjek(hasil.project, workspace.value)
+  await simpanLokal(hasil.project, hasil.client_updated_at)
+  daftarVersiTampil.value = null
+  statusSimpan.value = 'Versi lama dipulihkan.'
+}
+
+onMounted(async () => {
   Blockly.setLocale(LokalId)
   daftarkanBlok()
 
@@ -195,6 +259,7 @@ onMounted(() => {
   })
 
   workspace.value.addChangeListener(simpanKeJson)
+  workspace.value.addChangeListener(jadwalkanAutosave)
   simpanKeJson()
 
   // Layar HP (< 768px, sama dengan batas PRD 6.1 untuk mode kanvas) —
@@ -226,6 +291,24 @@ onMounted(() => {
     window.interpreter = interpreter.value
     window.workspace = workspace.value
     window.Blockly = Blockly
+  }
+
+  // --- Pulihkan kerja lokal dulu (offline-first, milestone 4.3) ---
+  const lokal = await bacaLokal()
+  if (lokal) {
+    muatProjek(lokal.project, workspace.value)
+    statusSimpan.value = 'Kerja terakhir dipulihkan dari perangkat ini.'
+  }
+
+  // --- Kalau ditempel di iframe (server/resources/js/Pages/Editor.vue),
+  //     tunggu token sinkron dari halaman induk lewat postMessage. ---
+  if (window.parent !== window) {
+    window.addEventListener('message', (e) => {
+      if (e.data?.jenis !== 'otak-atik:token') return
+      konfigurasiSinkron({ token: e.data.token, apiBase: e.data.apiBase })
+      sinkronSaatMulai(lokal)
+    })
+    window.parent.postMessage({ jenis: 'otak-atik:siap' }, '*')
   }
 })
 </script>
@@ -329,8 +412,23 @@ onMounted(() => {
             <button class="tbl kecil" @click="klikSimpan">Simpan projek</button>
             <button class="tbl kecil hantu" @click="klikBuka">Buka projek</button>
             <button class="tbl kecil" style="background: #ee6c2b" @click="klikEkspor">Ekspor jadi game</button>
+            <button class="tbl kecil hantu" @click="bukaRiwayatVersi">Riwayat versi</button>
             <input ref="berkasMasuk" type="file" accept=".json,application/json" hidden @change="berkasDipilih" />
             <span class="pesan">{{ pesanBerkas }}</span>
+            <span v-if="statusSimpan" class="pesan status-simpan">{{ statusSimpan }}</span>
+          </div>
+          <div v-if="daftarVersiTampil" class="riwayat-versi">
+            <div class="riwayat-kepala">
+              <span class="judul">Riwayat versi</span>
+              <button class="tutup" @click="daftarVersiTampil = null">✕</button>
+            </div>
+            <p v-if="daftarVersiTampil.length === 0" class="pesan">Belum ada riwayat tersimpan di awan.</p>
+            <ul v-else>
+              <li v-for="v in daftarVersiTampil" :key="v.id">
+                <span>{{ new Date(v.client_updated_at).toLocaleString('id-ID') }}</span>
+                <button class="tbl kecil hantu" @click="pulihkanKeVersi(v.id)">Pulihkan</button>
+              </li>
+            </ul>
           </div>
         </section>
 
@@ -669,6 +767,48 @@ canvas {
   font-size: 12.5px;
   color: var(--tinta-2);
   flex-basis: 100%;
+}
+.status-simpan {
+  color: #12a472 !important;
+}
+
+.riwayat-versi {
+  padding: 11px 14px;
+  border-top: 1px solid var(--garis);
+}
+.riwayat-kepala {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.riwayat-kepala .judul {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.riwayat-kepala .tutup {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--tinta-2);
+}
+.riwayat-versi ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+.riwayat-versi li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  gap: 8px;
 }
 
 .pesan-galat {

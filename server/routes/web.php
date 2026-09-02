@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\KelasController;
@@ -39,6 +40,11 @@ Route::middleware('auth')->group(function () {
     Route::resource('kelas', KelasController::class)->only(['index', 'store']);
     Route::post('/kelas/{kelas}/impor/pratinjau', [ImportSiswaController::class, 'pratinjau'])->name('kelas.impor.pratinjau');
     Route::post('/kelas/{kelas}/impor/proses', [ImportSiswaController::class, 'proses'])->name('kelas.impor.proses');
+
+    Route::get('/editor', function () {
+        return Inertia::render('Editor', ['editorUrl' => config('app.editor_url')]);
+    })->name('editor');
+    Route::post('/api-token', [TokenController::class, 'terbitkan'])->name('api-token');
 });
 
 require __DIR__.'/auth.php';
