@@ -376,4 +376,22 @@ export class Panggung {
     this.gambarBalon()
     this.gambarSkor()
   }
+
+  // Setiap fungsi Game API di atas memanggil gambar() sendiri supaya hasil
+  // langsung terlihat (enak dipakai dari konsol). Tapi kalau harus
+  // menjalankan ribuan langkah cepat sekaligus — mesin misi memeriksa
+  // "hasil di panggung" dengan menjalankan seluruh program terlebih dulu
+  // (lihat paket/misi) — menggambar ulang di SETIAP langkah akan sangat
+  // lambat. tanpaGambar() mematikan gambar() sementara, lalu menggambar
+  // sekali saja di akhir supaya anak tetap melihat keadaan akhirnya.
+  tanpaGambar(fn) {
+    const asli = this.gambar
+    this.gambar = () => {}
+    try {
+      fn()
+    } finally {
+      this.gambar = asli
+      this.gambar()
+    }
+  }
 }

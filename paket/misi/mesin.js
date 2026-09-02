@@ -51,26 +51,44 @@ export function runTerpanjang(list, t) {
   return terpanjang
 }
 
-const BATAS_LANGKAH_PERIKSA = 200000
+// Cukup besar untuk membuktikan perilaku berulang (misalnya bola yang
+// harus memantul beberapa kali) tanpa terasa lambat — lihat
+// Panggung.tanpaGambar(), yang membuat setiap langkah murni komputasi.
+const BATAS_LANGKAH_PERIKSA = 20000
 
-// Menjalankan AST sampai selesai TANPA requestAnimationFrame — khusus
-// pemeriksaan misi (proses cepat di belakang layar). Menjalankan program
-// untuk ANAK tetap lewat Interpreter di paket/runtime, bukan fungsi ini.
-export function jalankanUntukPeriksa(ast, panggung) {
+// Menjalankan AST TANPA requestAnimationFrame — khusus pemeriksaan misi
+// (proses cepat di belakang layar). Menjalankan program untuk ANAK tetap
+// lewat Interpreter di paket/runtime, bukan fungsi ini.
+//
+// Misi dengan "ulangi selamanya" (bola memantul, kendali tombol) memang
+// tidak pernah selesai sendiri — di situ pemeriksaan berhenti begitu
+// batasLangkah tercapai, lalu memeriksa keadaan yang sudah dicapai
+// sejauh itu. `selesai` memberi tahu pemanggil mana yang terjadi.
+export function jalankanUntukPeriksa(ast, panggung, batasLangkah = BATAS_LANGKAH_PERIKSA) {
   const vars = new Map()
-  const utas = jalankanUrutan(ast, panggung, vars)
-  let langkah = 0
-  let r = utas.next()
-  while (!r.done) {
-    langkah++
-    if (langkah > BATAS_LANGKAH_PERIKSA) {
-      throw new Error(
-        'Program tidak pernah selesai sendiri (kemungkinan "ulangi selamanya" tanpa syarat berhenti) — tidak bisa diperiksa otomatis.',
-      )
+  const jalankanSemua = () => {
+    const utas = jalankanUrutan(ast, panggung, vars)
+    let langkah = 0
+    let r = utas.next()
+    while (!r.done && langkah < batasLangkah) {
+      langkah++
+      r = utas.next()
     }
-    r = utas.next()
+    return { langkah, selesai: !!r.done }
   }
-  return { vars, langkah }
+
+  const { langkah, selesai } =
+    typeof panggung.tanpaGambar === 'function'
+      ? (() => {
+          let hasil
+          panggung.tanpaGambar(() => {
+            hasil = jalankanSemua()
+          })
+          return hasil
+        })()
+      : jalankanSemua()
+
+  return { vars, langkah, selesai }
 }
 
 // Bentuk satu Misi:
@@ -92,12 +110,7 @@ export function periksaMisi(misi, ast, panggung) {
   }
 
   panggung.aturUlang()
-  let vars
-  try {
-    ;({ vars } = jalankanUntukPeriksa(ast, panggung))
-  } catch (e) {
-    return { struktur, hasil: { lulus: false, pesan: e.message }, lulusSemua: false }
-  }
+  const { vars } = jalankanUntukPeriksa(ast, panggung)
 
   const hasil = misi.periksaHasil(panggung, vars)
   return { struktur, hasil, lulusSemua: struktur.lulus && hasil.lulus }

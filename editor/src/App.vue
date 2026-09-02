@@ -5,6 +5,7 @@ import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
 import { Interpreter, Panggung } from '@otak-atik/runtime'
 import { daftarkanBlok, kodeProgram, programAst as bangunProgramAst, TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
+import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -17,6 +18,32 @@ const interpreter = shallowRef(null)
 const sedangJalan = ref(false)
 const kecepatan = ref('normal')
 const pesanJalan = ref('')
+
+const misiIndeks = ref(0)
+const misiAktif = ref(MISI_TINGKAT_2[0])
+const misiLulus = ref(new Set())
+const hasilPeriksa = ref(null)
+
+function pilihMisi(i) {
+  misiIndeks.value = i
+  misiAktif.value = MISI_TINGKAT_2[i]
+  hasilPeriksa.value = null
+}
+
+function periksaMisiSekarang() {
+  if (!workspace.value || !panggung.value) return
+  const programAst = bangunProgramAst(workspace.value)
+  hasilPeriksa.value = periksaMisi(misiAktif.value, programAst, panggung.value)
+  if (hasilPeriksa.value.lulusSemua) {
+    misiLulus.value = new Set(misiLulus.value).add(misiAktif.value.id)
+  }
+  simpanKeJson()
+}
+
+function muatTemplat(templat) {
+  Blockly.serialization.workspaces.load(templat.blockly, workspace.value)
+  hasilPeriksa.value = null
+}
 
 function simpanKeJson() {
   if (!workspace.value) return
@@ -107,13 +134,53 @@ onMounted(() => {
     </header>
 
     <main class="tiga-panel">
-      <section class="panel panel-blok">
-        <div class="panel-kepala">
-          <span class="judul">Susun bloknya</span>
-          <span class="ket">Tarik blok dari kiri, sambungkan di bawah blok bendera</span>
-        </div>
-        <div ref="kanvasBlok" class="kanvas-blok"></div>
-      </section>
+      <div class="kolom-kiri">
+        <section class="panel panel-misi">
+          <div class="misi-daftar" role="group" aria-label="Pilih misi">
+            <button
+              v-for="(m, i) in MISI_TINGKAT_2"
+              :key="m.id"
+              class="misi-chip"
+              :class="{ tuntas: misiLulus.has(m.id) }"
+              :aria-pressed="misiIndeks === i"
+              @click="pilihMisi(i)"
+            >
+              <span class="nomor">{{ misiLulus.has(m.id) ? '✓' : i + 1 }}</span>
+              {{ m.judul.replace(/^\d+\.\s*/, '') }}
+            </button>
+          </div>
+          <div class="misi-isi">
+            <p>{{ misiAktif.instruksi }}</p>
+            <div class="periksa">
+              <button class="tbl hantu" @click="periksaMisiSekarang">Periksa misi</button>
+              <div v-if="hasilPeriksa" class="hasil-periksa">
+                <div class="cek" :class="hasilPeriksa.struktur.lulus ? 'ok' : 'gagal'">
+                  <span class="tanda">{{ hasilPeriksa.struktur.lulus ? '✓' : '✕' }}</span>
+                  <span><b>Cara mengerjakan</b><span>{{ hasilPeriksa.struktur.pesan }}</span></span>
+                </div>
+                <div class="cek" :class="hasilPeriksa.hasil.lulus ? 'ok' : 'gagal'">
+                  <span class="tanda">{{ hasilPeriksa.hasil.lulus ? '✓' : '✕' }}</span>
+                  <span><b>Hasil di panggung</b><span>{{ hasilPeriksa.hasil.pesan }}</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel panel-blok">
+          <div class="panel-kepala">
+            <span class="judul">Susun bloknya</span>
+            <span class="ket">Tarik blok dari kiri, sambungkan di bawah blok bendera</span>
+            <div class="templat">
+              <span>Mulai dari templat:</span>
+              <button v-for="t in TEMPLAT_TINGKAT_2" :key="t.id" class="tbl kecil hantu" @click="muatTemplat(t)">
+                {{ t.judul }}
+              </button>
+            </div>
+          </div>
+          <div ref="kanvasBlok" class="kanvas-blok"></div>
+        </section>
+      </div>
 
       <div class="kolom-kanan">
         <section class="panel panel-panggung">
@@ -215,10 +282,130 @@ onMounted(() => {
   align-items: start;
 }
 
-.kolom-kanan {
+.kolom-kanan,
+.kolom-kiri {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+}
+
+.misi-daftar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px 0;
+  flex-wrap: wrap;
+}
+.misi-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid var(--garis);
+  background: #fff;
+  color: var(--tinta);
+  padding: 7px 13px 7px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.misi-chip .nomor {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--meja);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--tinta-2);
+}
+.misi-chip[aria-pressed='true'] {
+  border-color: var(--tinta);
+  background: var(--tinta);
+  color: #fff;
+}
+.misi-chip[aria-pressed='true'] .nomor {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.misi-chip.tuntas .nomor {
+  background: #12a472;
+  color: #fff;
+}
+.misi-isi {
+  padding: 12px 14px 14px;
+}
+.misi-isi p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--tinta-2);
+}
+.periksa {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.hasil-periksa {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+}
+.cek {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  max-width: 320px;
+}
+.cek .tanda {
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--garis);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+.cek.ok .tanda {
+  background: #12a472;
+}
+.cek.gagal .tanda {
+  background: #e14b4b;
+}
+.cek b {
+  display: block;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.cek span span {
+  color: var(--tinta-2);
+}
+
+.templat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--tinta-2);
+  margin-left: auto;
+}
+.tbl.kecil {
+  font-size: 12.5px;
+  padding: 6px 12px;
+}
+.tbl.hantu {
+  background: transparent;
+  color: var(--tinta-2);
+  border: 1.5px solid var(--garis);
 }
 
 .panel {

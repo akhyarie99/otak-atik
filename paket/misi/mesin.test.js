@@ -1,50 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { normalisasiSudut, pantulkanDiTepi } from '@otak-atik/runtime'
 import { periksaMisi, runTerpanjang } from './mesin.js'
 import { misiPersegi } from './misi-contoh.js'
-
-// Panggung tiruan tanpa canvas/DOM, memakai matematika murni yang sama
-// dengan paket/runtime/panggung.js, supaya periksaHasil() bisa diuji di
-// Node tanpa perlu jsdom+canvas asli.
-function panggungTiruan() {
-  const LEBAR = 480
-  const TINGGI = 360
-  const p = {
-    sprite: { x: 0, y: 0, arah: 90, penaTurun: false, ucap: '' },
-    statistik: { totalPutar: 0, pantul: 0, jarakTotal: 0 },
-    skor: null,
-    aturUlang() {
-      p.sprite = { x: 0, y: 0, arah: 90, penaTurun: false, ucap: '' }
-      p.statistik = { totalPutar: 0, pantul: 0, jarakTotal: 0 }
-    },
-    maju(n) {
-      const r = (p.sprite.arah * Math.PI) / 180
-      p.pergiKe(p.sprite.x + Math.sin(r) * n, p.sprite.y + Math.cos(r) * n)
-      p.statistik.jarakTotal += Math.abs(n)
-    },
-    pergiKe(x, y) {
-      p.sprite.x = x
-      p.sprite.y = y
-    },
-    putar(d) {
-      p.sprite.arah = normalisasiSudut(p.sprite.arah + d)
-      p.statistik.totalPutar += d
-    },
-    pantulTepi() {
-      const hasil = pantulkanDiTepi(p.sprite, LEBAR, TINGGI)
-      p.sprite.x = hasil.x
-      p.sprite.y = hasil.y
-      p.sprite.arah = hasil.arah
-      if (hasil.kena) p.statistik.pantul++
-    },
-    penaTurun() {},
-    warnaPena() {},
-    hapusGambar() {},
-    katakan() {},
-    ucapkan: () => null,
-  }
-  return p
-}
+import { panggungTiruan } from './uji-bantu.js'
 
 describe('runTerpanjang', () => {
   it('menghitung run terpanjang dari tipe yang sama di satu level', () => {
