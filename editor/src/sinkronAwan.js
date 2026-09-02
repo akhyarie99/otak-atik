@@ -53,3 +53,20 @@ export async function daftarVersi() {
 export async function pulihkanVersi(idVersi) {
   return panggil(`/mutakhir/versi/${idVersi}/pulihkan`, { method: 'POST' })
 }
+
+// Dasar papan progres & ekspor nilai guru (milestone 4.4) — dicatat
+// setiap kali "Periksa misi" ditekan, lulus atau tidak (PRD 6.4: nomor
+// percobaan lebih berguna daripada nilai akhir).
+export async function catatPercobaanMisi(misiId, lulus) {
+  if (!siapSinkron()) return
+  try {
+    await fetch(`${apiBase}/api/misi/percobaan`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ misi_id: misiId, lulus }),
+    })
+  } catch {
+    // Luring atau gagal — tidak menghalangi anak tetap melihat hasil
+    // periksa misinya sendiri, cuma guru yang tidak dapat catatannya.
+  }
+}

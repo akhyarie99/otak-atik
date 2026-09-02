@@ -18,7 +18,15 @@ import { unduhEksporHtml } from './ekspor'
 import ModeKartu from './ModeKartu.vue'
 import { kuncilLanskapUntukBermain, lepasKunciLanskap } from './orientasi'
 import { bacaLokal, simpanLokal } from './simpanLokal'
-import { daftarVersi, dorongKeAwan, konfigurasiSinkron, pulihkanVersi, siapSinkron, tarikDariAwan } from './sinkronAwan'
+import {
+  catatPercobaanMisi,
+  daftarVersi,
+  dorongKeAwan,
+  konfigurasiSinkron,
+  pulihkanVersi,
+  siapSinkron,
+  tarikDariAwan,
+} from './sinkronAwan'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -58,6 +66,7 @@ function periksaMisiSekarang() {
   if (hasilPeriksa.value.lulusSemua) {
     misiLulus.value = new Set(misiLulus.value).add(misiAktif.value.id)
   }
+  catatPercobaanMisi(misiAktif.value.id, hasilPeriksa.value.lulusSemua)
   simpanKeJson()
 }
 

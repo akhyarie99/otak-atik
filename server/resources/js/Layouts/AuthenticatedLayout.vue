@@ -39,6 +39,15 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
+                                    Kelas
+                                </NavLink>
+                                <NavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
+                                    Tugas
+                                </NavLink>
+                                <NavLink :href="route('editor')" :active="route().current('editor')">
+                                    Editor
+                                </NavLink>
                             </div>
                         </div>
 
@@ -145,6 +154,15 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('dashboard')"
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
+                            Kelas
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
+                            Tugas
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink :href="route('editor')" :active="route().current('editor')">
+                            Editor
                         </ResponsiveNavLink>
                     </div>
 
