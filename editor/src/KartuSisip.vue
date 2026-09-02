@@ -75,4 +75,14 @@ function tambah(e) {
   cursor: pointer;
   max-width: 160px;
 }
+
+/* Target sentuh >= 56px di layar HP — milestone 3.2. */
+@media (max-width: 768px) {
+  .kartu-sisip {
+    min-height: 56px;
+    max-width: none;
+    width: 100%;
+    font-size: 15px;
+  }
+}
 </style>

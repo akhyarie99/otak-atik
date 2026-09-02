@@ -205,4 +205,29 @@ function hapusKondisi() {
   color: #e14b4b;
   cursor: pointer;
 }
+
+/* Target sentuh >= 56px di layar HP — milestone 3.2. Tombol boleh
+   membungkus ke bawah kartu kalau tidak muat sebaris, tapi ukurannya
+   sendiri tidak pernah dikecilkan di bawah 56px. */
+@media (max-width: 768px) {
+  .isi {
+    row-gap: 8px;
+  }
+  .aksi {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .aksi button {
+    width: 56px;
+    height: 56px;
+    font-size: 17px;
+  }
+  .bidang {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .bidang-angka {
+    width: 76px;
+  }
+}
 </style>

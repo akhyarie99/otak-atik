@@ -16,6 +16,7 @@ import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
 import { bacaBerkasProjek, muatProjek, simpanProjek } from './berkas'
 import { unduhEksporHtml } from './ekspor'
 import ModeKartu from './ModeKartu.vue'
+import { kuncilLanskapUntukBermain, lepasKunciLanskap } from './orientasi'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -165,11 +166,13 @@ function jalankan() {
   interpreter.value.aturKecepatan(kecepatan.value)
   interpreter.value.mulai(programAst)
   sedangJalan.value = true
+  kuncilLanskapUntukBermain()
 }
 
 function berhenti() {
   interpreter.value.berhenti()
   sedangJalan.value = false
+  lepasKunciLanskap()
 }
 
 function ubahKecepatan(nama) {
@@ -194,14 +197,24 @@ onMounted(() => {
   workspace.value.addChangeListener(simpanKeJson)
   simpanKeJson()
 
+  // Layar HP (< 768px, sama dengan batas PRD 6.1 untuk mode kanvas) —
+  // buka mode kartu dari awal. Anak yang hanya punya HP tidak boleh
+  // disambut kanvas kecil yang susah diseret (milestone 3.2).
+  if (window.innerWidth < 768) {
+    segarkanKartuDariWorkspace()
+    modeTampilan.value = 'kartu'
+  }
+
   panggung.value = new Panggung(kanvasPanggung.value)
   interpreter.value = new Interpreter(panggung.value, {
     onLangkah: sorotBlok,
     onSelesai: () => {
       sedangJalan.value = false
+      lepasKunciLanskap()
     },
     onError: (e) => {
       sedangJalan.value = false
+      lepasKunciLanskap()
       pesanJalan.value = 'Program berhenti karena galat: ' + e.message
       console.error(e)
     },
@@ -706,6 +719,40 @@ canvas {
   .kanvas-blok {
     height: 56vh;
     min-height: 320px;
+  }
+}
+
+/* Target sentuh >= 56px di layar HP — milestone 3.2 (rencana-build.md).
+   Di atas 768px (mode kanvas biasa dipakai dari komputer/tablet lebar)
+   target sentuh yang lebih pas-desktop sudah cukup, jadi tidak dipaksa
+   sebesar ini di sana — memaksakannya di layar lebar cuma membuang ruang. */
+@media (max-width: 768px) {
+  .tbl {
+    min-height: 56px;
+    padding-left: 22px;
+    padding-right: 22px;
+    font-size: 16px;
+  }
+  .tbl.kecil {
+    min-height: 48px;
+  }
+  .seg button {
+    min-height: 56px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+  .misi-chip {
+    min-height: 56px;
+    padding: 8px 16px 8px 10px;
+    font-size: 15px;
+  }
+  .misi-chip .nomor {
+    width: 30px;
+    height: 30px;
+  }
+  .tab {
+    min-height: 56px;
+    padding: 14px 16px;
   }
 }
 </style>
