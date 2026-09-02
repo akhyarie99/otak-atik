@@ -6,6 +6,7 @@ use App\Enums\Peran;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 // Peran melekat di sini, bukan di User (PRD 6.8). Satu akun (User) bisa
 // punya banyak baris Keanggotaan dengan peran & sekolah berbeda-beda.
@@ -31,5 +32,10 @@ class Keanggotaan extends Model
     public function sekolah(): BelongsTo
     {
         return $this->belongsTo(Sekolah::class);
+    }
+
+    public function kelas(): BelongsToMany
+    {
+        return $this->belongsToMany(Kelas::class, 'kelas_anggota');
     }
 }

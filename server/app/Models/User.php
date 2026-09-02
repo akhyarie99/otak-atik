@@ -30,6 +30,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'nama_panggilan',
+        'pin_hash',
     ];
 
     /**
@@ -39,6 +41,7 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'pin_hash',
         'remember_token',
     ];
 
@@ -52,6 +55,13 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // pin_hash SENGAJA tidak pakai cast 'hashed' (yang otomatis
+            // pakai cost bcrypt penuh, ~250ms/hash) — PIN cuma 4 digit,
+            // ruang kuncinya kecil, cost tinggi tidak menambah keamanan
+            // berarti (lihat ImportSiswaController) tapi membuat impor
+            // ratusan siswa jadi lambat sekali. Perlindungan sungguhan
+            // ada di pembatasan percobaan login (throttle), bukan cost
+            // hash. Di-hash manual dengan cost rendah di tempat PIN dibuat.
         ];
     }
 }

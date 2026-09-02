@@ -14,6 +14,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+            \App\Http\Middleware\AktifkanTenant::class,
+        ]);
+
+        // AktifkanTenant WAJIB jalan sebelum SubstituteBindings — kalau
+        // tidak, route model binding (mis. {kelas}) mencari modelnya
+        // SEBELUM TenantContext aktif, dan TenantScope yang gagal
+        // tertutup (aturan tetap #5) membuatnya selalu 404. append()
+        // saja tidak menjamin urutan ini, jadi dipaksa eksplisit di sini.
+        $middleware->priority([
+            \Illuminate\Session\Middleware\StartSession::class,
+            \App\Http\Middleware\AktifkanTenant::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
         //

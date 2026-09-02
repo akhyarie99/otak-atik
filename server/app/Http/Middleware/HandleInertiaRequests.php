@@ -29,11 +29,16 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $keanggotaan = $request->attributes->get('keanggotaan_aktif');
+
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
             ],
+            'keanggotaanAktif' => $keanggotaan
+                ? ['id' => $keanggotaan->id, 'peran' => $keanggotaan->peran->value, 'sekolah' => $keanggotaan->sekolah?->nama]
+                : null,
         ];
     }
 }

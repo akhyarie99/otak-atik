@@ -24,6 +24,7 @@ class KelasFactory extends Factory
         return [
             'nama' => $this->faker->randomElement(['4A', '4B', '5A', '5B', '6A']),
             'tahun_ajaran' => '2026/2027',
+            'kode_kelas' => strtoupper($this->faker->unique()->bothify('??????')),
         ];
     }
 }
