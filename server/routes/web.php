@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Auth\SiswaAuthController;
+use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\KelasController;
 use App\Http\Controllers\LkpdController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgresController;
+use App\Http\Controllers\ReaksiController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\TugasController;
 use Illuminate\Foundation\Application;
@@ -56,6 +58,15 @@ Route::middleware('auth')->group(function () {
     Route::resource('tugas', TugasController::class)->only(['index', 'store']);
     Route::get('/kelas/{kelas}/progres', [ProgresController::class, 'tampilkan'])->name('progres.tampilkan');
     Route::get('/kelas/{kelas}/progres/csv', [ProgresController::class, 'eksporCsv'])->name('progres.csv');
+
+    Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri.index');
+    Route::get('/galeri/{karya}/mainkan', [GaleriController::class, 'mainkan'])->name('galeri.mainkan');
+    Route::post('/karya/{karya}/terbitkan', [GaleriController::class, 'terbitkan'])->name('karya.terbitkan');
+    Route::post('/karya/{karya}/promosikan-sekolah', [GaleriController::class, 'promosikanSekolah'])->name('karya.promosikan');
+    Route::post('/karya/{karya}/sembunyikan', [GaleriController::class, 'sembunyikan'])->name('karya.sembunyikan');
+    Route::post('/karya/{karya}/tampilkan', [GaleriController::class, 'tampilkanKembali'])->name('karya.tampilkan');
+    Route::post('/karya/{karya}/reaksi', [ReaksiController::class, 'simpan'])->name('karya.reaksi');
+    Route::delete('/karya/{karya}/reaksi', [ReaksiController::class, 'hapus'])->name('karya.reaksi.hapus');
 });
 
 require __DIR__.'/auth.php';

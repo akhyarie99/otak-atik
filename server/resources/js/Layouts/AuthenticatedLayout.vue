@@ -45,6 +45,9 @@ const showingNavigationDropdown = ref(false);
                                 <NavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
                                     Tugas
                                 </NavLink>
+                                <NavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
+                                    Galeri
+                                </NavLink>
                                 <NavLink :href="route('editor')" :active="route().current('editor')">
                                     Editor
                                 </NavLink>
@@ -160,6 +163,9 @@ const showingNavigationDropdown = ref(false);
                         </ResponsiveNavLink>
                         <ResponsiveNavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
                             Tugas
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
+                            Galeri
                         </ResponsiveNavLink>
                         <ResponsiveNavLink :href="route('editor')" :active="route().current('editor')">
                             Editor
