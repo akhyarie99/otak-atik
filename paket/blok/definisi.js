@@ -347,6 +347,36 @@ export function daftarkanBlok() {
   Blockly.common.defineBlocks(Blockly.common.createBlockDefinitionsFromJsonArray(DEFINISI_BLOK))
 }
 
+// --- Metadata generik dipakai mode kartu (milestone 3.1) untuk merender
+//     field & drawer tanpa menulis UI khusus per blok satu-satu. ---
+
+export const BLOK_PER_TIPE = Object.fromEntries(DEFINISI_BLOK.map((d) => [d.type, d]))
+
+// Field yang bisa diedit langsung (field_number/field_input/field_dropdown/
+// field_variable) — input_value/input_statement bukan "field", itu soket.
+export function daftarFieldBlok(type) {
+  const def = BLOK_PER_TIPE[type]
+  if (!def) return []
+  const semua = []
+  for (const k of ['args0', 'args1', 'args2', 'args3']) {
+    for (const a of def[k] || []) {
+      if (a.type && a.type.startsWith('field_')) semua.push(a)
+    }
+  }
+  return semua
+}
+
+export function punyaSoket(type, nama) {
+  const def = BLOK_PER_TIPE[type]
+  if (!def) return false
+  for (const k of ['args0', 'args1', 'args2', 'args3']) {
+    for (const a of def[k] || []) {
+      if (a.name === nama && (a.type === 'input_statement' || a.type === 'input_value')) return true
+    }
+  }
+  return false
+}
+
 export const TOOLBOX_TINGKAT_2 = {
   kind: 'categoryToolbox',
   contents: [

@@ -1,16 +1,26 @@
 <script setup>
-import { onMounted, ref, shallowRef } from 'vue'
+import { onMounted, ref, shallowRef, watch } from 'vue'
 import * as Blockly from 'blockly/core'
 import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
 import { Interpreter, Panggung } from '@otak-atik/runtime'
-import { daftarkanBlok, kodeProgram, programAst as bangunProgramAst, TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
+import {
+  blocklyKeKartu,
+  daftarkanBlok,
+  kartuKeBlockly,
+  kodeProgram,
+  programAst as bangunProgramAst,
+  TOOLBOX_TINGKAT_2,
+} from '@otak-atik/blok'
 import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
 import { bacaBerkasProjek, muatProjek, simpanProjek } from './berkas'
 import { unduhEksporHtml } from './ekspor'
+import ModeKartu from './ModeKartu.vue'
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
+const modeTampilan = ref('kanvas') // 'kanvas' | 'kartu'
+const kartuProgram = ref([])
 const berkasMasuk = ref(null)
 const pesanBerkas = ref(
   'Projek tersimpan sebagai .json. Game hasil ekspor berupa satu berkas .html yang bisa dibuka tanpa internet.',
@@ -50,6 +60,50 @@ function muatTemplat(templat) {
   Blockly.serialization.workspaces.load(templat.blockly, workspace.value)
   hasilPeriksa.value = null
 }
+
+function variabelWorkspace() {
+  return workspace.value.getAllVariables().map((v) => ({ name: v.name, id: v.getId(), type: v.type }))
+}
+
+// Sinkron kanvas -> kartu: bendera (dan seluruh badan lewat rantai .next)
+// dibaca dari workspace Blockly yang sama, tanpa ubah bentuk data sama
+// sekali (milestone 3.1 — "selesai bila" program identik di kedua mode).
+function segarkanKartuDariWorkspace() {
+  const data = Blockly.serialization.workspaces.save(workspace.value)
+  const top = data.blocks?.blocks?.[0] || null
+  kartuProgram.value = blocklyKeKartu(top)
+}
+
+// Sinkron kartu -> kanvas: kebalikannya, dipanggil saat pindah balik ke
+// mode kanvas supaya perubahan yang dibuat lewat kartu tidak hilang.
+function tulisKartuKeWorkspace() {
+  const top = kartuKeBlockly(kartuProgram.value)
+  const data = { variables: variabelWorkspace(), blocks: { languageVersion: 0, blocks: top ? [top] : [] } }
+  Blockly.serialization.workspaces.load(data, workspace.value)
+}
+
+function gantiMode(baru) {
+  if (baru === modeTampilan.value) return
+  if (baru === 'kartu') segarkanKartuDariWorkspace()
+  else tulisKartuKeWorkspace()
+  modeTampilan.value = baru
+  simpanKeJson()
+}
+
+// Selagi di mode kartu, setiap perubahan (tambah/hapus/geser/ubah field)
+// langsung ditulis balik ke workspace Blockly yang sama, supaya panel
+// Kode/JSON dan tombol Jalankan/Periksa misi tetap hidup tanpa harus
+// pindah mode dulu. Ini juga yang membuat kedua mode "satu struktur yang
+// sama", bukan dua salinan yang disinkron sesekali.
+watch(
+  kartuProgram,
+  () => {
+    if (modeTampilan.value !== 'kartu' || !workspace.value) return
+    tulisKartuKeWorkspace()
+    simpanKeJson()
+  },
+  { deep: true },
+)
 
 function klikSimpan() {
   const ukuran = simpanProjek(workspace.value)
@@ -210,7 +264,10 @@ onMounted(() => {
         <section class="panel panel-blok">
           <div class="panel-kepala">
             <span class="judul">Susun bloknya</span>
-            <span class="ket">Tarik blok dari kiri, sambungkan di bawah blok bendera</span>
+            <div class="seg seg-mode" role="group" aria-label="Mode tampilan blok">
+              <button :aria-pressed="modeTampilan === 'kanvas'" @click="gantiMode('kanvas')">Kanvas</button>
+              <button :aria-pressed="modeTampilan === 'kartu'" @click="gantiMode('kartu')">Kartu</button>
+            </div>
             <div class="templat">
               <span>Mulai dari templat:</span>
               <button v-for="t in TEMPLAT_TINGKAT_2" :key="t.id" class="tbl kecil hantu" @click="muatTemplat(t)">
@@ -218,7 +275,13 @@ onMounted(() => {
               </button>
             </div>
           </div>
-          <div ref="kanvasBlok" class="kanvas-blok"></div>
+          <span class="ket ket-blok">{{
+            modeTampilan === 'kanvas'
+              ? 'Tarik blok dari kiri, sambungkan di bawah blok bendera'
+              : 'Ketuk "+ tambah blok" untuk menyisipkan, panah untuk memindah urutan'
+          }}</span>
+          <div v-show="modeTampilan === 'kanvas'" ref="kanvasBlok" class="kanvas-blok"></div>
+          <ModeKartu v-if="modeTampilan === 'kartu'" class="kanvas-blok" :kartu="kartuProgram" :workspace="workspace" />
         </section>
       </div>
 
@@ -478,6 +541,16 @@ onMounted(() => {
   font-size: 12.5px;
   color: var(--tinta-2);
   opacity: 0.8;
+}
+.ket-blok {
+  display: block;
+  padding: 8px 14px 0;
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  opacity: 0.8;
+}
+.seg-mode {
+  margin-left: 4px;
 }
 
 .kanvas-blok {
