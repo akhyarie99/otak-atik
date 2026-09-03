@@ -16,4 +16,5 @@ export {
 } from './definisi.js'
 export { astSatu, astKondisi, astNilai, astUrutan, programAst, programFungsi, programSkripLain, TIPE_BENDERA } from './ast.js'
 export { kodeProgram, kodeUrutan } from './kode.js'
+export { teksKeAst, GalatParser } from './parserTeks.js'
 export { blocklyKeKartu, kartuKeBlockly, programKeWorkspaceJson, kartuBaru, idKartuBaru } from './kartu.js'

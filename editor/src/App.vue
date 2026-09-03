@@ -8,9 +8,11 @@ import {
   BLOK_PER_TIPE,
   blocklyKeKartu,
   daftarkanBlok,
+  GalatParser,
   kartuKeBlockly,
   kodeProgram,
   programAst as bangunProgramAst,
+  teksKeAst,
   TIPE_BENDERA,
   TOOLBOX_TINGKAT_1,
   TOOLBOX_TINGKAT_2,
@@ -32,15 +34,19 @@ import {
   tarikDariAwan,
 } from './sinkronAwan'
 import { TEMA_TINGKAT_1 } from './temaTingkat1'
+import { TEMA_TINGKAT_4 } from './temaTingkat4'
 import { aturTtsBisu, bicarakan, ttsBisu } from './tts'
 
-// Tingkat dipilih lewat parameter URL (?tingkat=1|3), diteruskan dari
-// iframe server/resources/js/Pages/Editor.vue — milestone 6.1/6.2. Bawaan
-// tingkat 2 (perilaku sebelum milestone ini, tidak berubah kalau parameter
-// tidak ada atau nilainya tidak dikenali).
+// Tingkat dipilih lewat parameter URL (?tingkat=1|3|4), diteruskan dari
+// iframe server/resources/js/Pages/Editor.vue — milestone 6.1/6.2/6.3.
+// Bawaan tingkat 2 (perilaku sebelum milestone-milestone ini, tidak
+// berubah kalau parameter tidak ada atau nilainya tidak dikenali).
 const paramTingkat = new URLSearchParams(window.location.search).get('tingkat')
-const tingkat = paramTingkat === '1' ? 1 : paramTingkat === '3' ? 3 : 2
-const toolboxAktif = tingkat === 1 ? TOOLBOX_TINGKAT_1 : tingkat === 3 ? TOOLBOX_TINGKAT_3 : TOOLBOX_TINGKAT_2
+const tingkat = paramTingkat === '1' ? 1 : paramTingkat === '3' ? 3 : paramTingkat === '4' ? 4 : 2
+// Tingkat 4 (SMA) memakai toolbox & tema tingkat 3 apa adanya (PRD:
+// "blok jadi opsional" — bukan blok BARU, cuma editor teksnya yang baru,
+// lihat milestone 6.3) plus tema gelap (temaTingkat4.js).
+const toolboxAktif = tingkat === 1 ? TOOLBOX_TINGKAT_1 : tingkat >= 3 ? TOOLBOX_TINGKAT_3 : TOOLBOX_TINGKAT_2
 // Tingkat 3 (SMP) memakai misi tingkat 2 apa adanya — blok tingkat 3 adalah
 // SUPERSET tingkat 2 (semua blok tingkat 2 tetap ada), jadi setiap misi
 // tingkat 2 tetap bisa dikerjakan; belum ada misi baru yang KHUSUS
@@ -106,8 +112,63 @@ function pasangTtsKetukBlok(ws) {
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
-const modeTampilan = ref('kanvas') // 'kanvas' | 'kartu'
+const modeTampilan = ref('kanvas') // 'kanvas' | 'kartu' | 'teks' (tingkat 4)
 const kartuProgram = ref([])
+
+// --- Mode teks tingkat 4 (milestone 6.3) — SATU ARAH: blok -> teks, lalu
+// teks mengambil alih PERMANEN untuk karya ini (versi pertama yang secara
+// eksplisit diizinkan rencana-build.md kalau dua-arah penuh terlalu berat
+// untuk satu sesi — lihat catatan lengkap di paket/blok/parserTeks.js).
+// astTerkunci != null berarti "karya ini sudah di mode teks" — begitu
+// terisi, blok tidak lagi dipakai sama sekali (jalankan/ekspor/simpan
+// semua baca dari astTerkunci, bukan dari workspace Blockly lagi).
+const teksProgram = ref('')
+const astTerkunci = shallowRef(null)
+const galatTeks = ref('')
+
+function programAstUntukJalan() {
+  return astTerkunci.value ?? bangunProgramAst(workspace.value)
+}
+
+function masukModeTeks() {
+  if (!astTerkunci.value) teksProgram.value = kodeProgram(bangunProgramAst(workspace.value))
+  modeTampilan.value = 'teks'
+  galatTeks.value = ''
+}
+
+function terapkanTeks() {
+  try {
+    const ast = teksKeAst(teksProgram.value)
+    astTerkunci.value = ast
+    galatTeks.value = ''
+    isiKode.value = teksProgram.value
+    isiJson.value = JSON.stringify({ format: 'otak-atik-teks', versi: 1, program: ast }, null, 2)
+    pesanBerkas.value = 'Karya ini sekarang mode teks — blok tidak lagi dipakai untuk karya ini.'
+    jadwalkanAutosave() // simpan versi teks ini juga (lokal + awan), sama seperti perubahan blok
+  } catch (e) {
+    galatTeks.value = e instanceof GalatParser ? e.message : `Galat tidak terduga: ${e.message}`
+  }
+}
+
+// Pengganti muatProjek() polos di semua titik pemuatan (buka berkas, tarik
+// awan, pulihkan versi, kerja lokal tersimpan) — kalau data.teksSumber ada,
+// karya ini disimpan sewaktu masih "mode teks terkunci" (milestone 6.3):
+// dipulihkan ke mode teks lagi apa adanya, BUKAN diam-diam kembali ke blok
+// basi (lihat catatan opsi.teksSumber di berkas.js:berkasProjek).
+function muatProjekKeEditor(data) {
+  muatProjek(data, workspace.value)
+  if (data.teksSumber) {
+    teksProgram.value = data.teksSumber
+    astTerkunci.value = data.program
+    modeTampilan.value = 'teks'
+    galatTeks.value = ''
+  } else if (astTerkunci.value) {
+    // Karya SEBELUMNYA di mode teks (sesi ini), yang baru dimuat BUKAN —
+    // lepas kuncinya supaya tidak menimpa program blok yang baru dimuat.
+    astTerkunci.value = null
+    if (modeTampilan.value === 'teks') modeTampilan.value = 'kanvas'
+  }
+}
 const berkasMasuk = ref(null)
 const pesanBerkas = ref(
   'Projek tersimpan sebagai .json. Game hasil ekspor berupa satu berkas .html yang bisa dibuka tanpa internet.',
@@ -137,8 +198,7 @@ function pilihMisi(i) {
 
 function periksaMisiSekarang() {
   if (!workspace.value || !panggung.value) return
-  const programAst = bangunProgramAst(workspace.value)
-  hasilPeriksa.value = periksaMisi(misiAktif.value, programAst, panggung.value)
+  hasilPeriksa.value = periksaMisi(misiAktif.value, programAstUntukJalan(), panggung.value)
   if (hasilPeriksa.value.lulusSemua) {
     misiLulus.value = new Set(misiLulus.value).add(misiAktif.value.id)
   }
@@ -174,6 +234,11 @@ function tulisKartuKeWorkspace() {
 
 function gantiMode(baru) {
   if (baru === modeTampilan.value) return
+  if (baru === 'teks') {
+    masukModeTeks()
+    return
+  }
+  if (astTerkunci.value) return // sudah terkunci mode teks (lihat terapkanTeks) — tidak bisa balik ke blok
   if (baru === 'kartu') segarkanKartuDariWorkspace()
   else tulisKartuKeWorkspace()
   modeTampilan.value = baru
@@ -196,7 +261,10 @@ watch(
 )
 
 function klikSimpan() {
-  const ukuran = simpanProjek(workspace.value)
+  const ukuran = simpanProjek(workspace.value, 'karyaku.json', {
+    program: astTerkunci.value,
+    teksSumber: astTerkunci.value ? teksProgram.value : null,
+  })
   pesanBerkas.value = `Projek tersimpan (${(ukuran / 1024).toFixed(1)} KB).`
 }
 
@@ -210,7 +278,7 @@ async function berkasDipilih(e) {
   if (!file) return
   try {
     const data = await bacaBerkasProjek(file)
-    muatProjek(data, workspace.value)
+    muatProjekKeEditor(data)
     hasilPeriksa.value = null
     pesanBerkas.value = `Projek "${file.name}" berhasil dibuka.`
   } catch (err) {
@@ -219,9 +287,8 @@ async function berkasDipilih(e) {
 }
 
 function klikEkspor() {
-  const programAst = bangunProgramAst(workspace.value)
   const judul = misiAktif.value?.judul || 'Karyaku'
-  const { ukuran } = unduhEksporHtml(programAst, judul)
+  const { ukuran } = unduhEksporHtml(programAstUntukJalan(), judul)
   const kb = (ukuran / 1024).toFixed(2)
   pesanBerkas.value =
     ukuran < 15 * 1024
@@ -230,7 +297,7 @@ function klikEkspor() {
 }
 
 function simpanKeJson() {
-  if (!workspace.value) return
+  if (!workspace.value || astTerkunci.value) return // mode teks terkunci sudah mengisi isiJson/isiKode sendiri (lihat terapkanTeks)
   const data = Blockly.serialization.workspaces.save(workspace.value)
   isiJson.value = JSON.stringify(data, null, 2)
   isiKode.value = kodeProgram(bangunProgramAst(workspace.value))
@@ -245,18 +312,19 @@ function sorotBlok(id) {
 }
 
 function jalankan() {
-  const bendera = workspace.value.getTopBlocks(true).find((b) => TIPE_BENDERA.has(b.type))
-  if (!bendera) {
-    pesanJalan.value =
-      tingkat === 1
-        ? 'Belum ada blok "🏁 Mulai". Tarik dulu dari kategori Mulai.'
-        : 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
-    return
+  if (!astTerkunci.value) {
+    const bendera = workspace.value.getTopBlocks(true).find((b) => TIPE_BENDERA.has(b.type))
+    if (!bendera) {
+      pesanJalan.value =
+        tingkat === 1
+          ? 'Belum ada blok "🏁 Mulai". Tarik dulu dari kategori Mulai.'
+          : 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
+      return
+    }
   }
   pesanJalan.value = ''
-  const programAst = bangunProgramAst(workspace.value)
   interpreter.value.aturKecepatan(kecepatan.value)
-  interpreter.value.mulai(programAst)
+  interpreter.value.mulai(programAstUntukJalan())
   sedangJalan.value = true
   kuncilLanskapUntukBermain()
 }
@@ -281,7 +349,10 @@ function jadwalkanAutosave() {
 }
 
 async function autosaveSekarang() {
-  const project = berkasProjek(workspace.value)
+  const project = berkasProjek(workspace.value, {
+    program: astTerkunci.value,
+    teksSumber: astTerkunci.value ? teksProgram.value : null,
+  })
   const waktu = new Date().toISOString()
   await simpanLokal(project, waktu)
   statusSimpan.value = 'Tersimpan di perangkat ini.'
@@ -293,7 +364,7 @@ async function autosaveSekarang() {
       // Server menang (ada tulisan lain yang lebih baru, mis. dari
       // perangkat lain) — samakan editor ini ke keadaan itu supaya
       // tidak diam-diam berbeda dari yang tersimpan.
-      muatProjek(hasil.project, workspace.value)
+      muatProjekKeEditor(hasil.project)
       await simpanLokal(hasil.project, hasil.client_updated_at)
       statusSimpan.value = 'Disamakan dengan versi terbaru dari perangkat lain.'
     } else {
@@ -308,7 +379,7 @@ async function sinkronSaatMulai(lokal) {
   try {
     const server = await tarikDariAwan()
     if (server && (!lokal || new Date(server.client_updated_at) > new Date(lokal.clientUpdatedAt))) {
-      muatProjek(server.project, workspace.value)
+      muatProjekKeEditor(server.project)
       await simpanLokal(server.project, server.client_updated_at)
       statusSimpan.value = 'Karya dimuat dari awan (versi terbaru).'
     } else if (lokal) {
@@ -326,7 +397,7 @@ async function bukaRiwayatVersi() {
 
 async function pulihkanKeVersi(idVersi) {
   const hasil = await pulihkanVersi(idVersi)
-  muatProjek(hasil.project, workspace.value)
+  muatProjekKeEditor(hasil.project)
   await simpanLokal(hasil.project, hasil.client_updated_at)
   daftarVersiTampil.value = null
   statusSimpan.value = 'Versi lama dipulihkan.'
@@ -341,7 +412,7 @@ onMounted(async () => {
     renderer: 'zelos',
     trashcan: true,
     sounds: false,
-    theme: tingkat === 1 ? TEMA_TINGKAT_1 : undefined,
+    theme: tingkat === 1 ? TEMA_TINGKAT_1 : tingkat === 4 ? TEMA_TINGKAT_4 : undefined,
     zoom: { controls: true, wheel: true, startScale: tingkat === 1 ? 1.1 : 0.85, minScale: 0.5, maxScale: 1.6 },
     move: { scrollbars: true, drag: true, wheel: true },
     grid: { spacing: 26, length: 2, colour: '#E4E9F5', snap: false },
@@ -386,7 +457,7 @@ onMounted(async () => {
   // --- Pulihkan kerja lokal dulu (offline-first, milestone 4.3) ---
   const lokal = await bacaLokal()
   if (lokal) {
-    muatProjek(lokal.project, workspace.value)
+    muatProjekKeEditor(lokal.project)
     statusSimpan.value = 'Kerja terakhir dipulihkan dari perangkat ini.'
   }
 
@@ -420,7 +491,13 @@ onMounted(async () => {
         {{ ttsBisuNow ? '🔇' : '🔊' }}
       </button>
       <span class="lencana">{{
-        tingkat === 1 ? 'Tingkat 1 · SD kelas 1–3' : tingkat === 3 ? 'Tingkat 3 · SMP' : 'Tingkat 2 · SD kelas 4–6'
+        tingkat === 1
+          ? 'Tingkat 1 · SD kelas 1–3'
+          : tingkat === 3
+            ? 'Tingkat 3 · SMP'
+            : tingkat === 4
+              ? 'Tingkat 4 · SMA'
+              : 'Tingkat 2 · SD kelas 4–6'
       }}</span>
     </header>
 
@@ -458,14 +535,16 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="panel panel-blok">
+        <section class="panel panel-blok" :class="{ 'panel-gelap': tingkat === 4 }">
           <div class="panel-kepala">
             <span class="judul">Susun bloknya</span>
-            <div class="seg seg-mode" role="group" aria-label="Mode tampilan blok">
+            <div v-if="!astTerkunci" class="seg seg-mode" role="group" aria-label="Mode tampilan blok">
               <button :aria-pressed="modeTampilan === 'kanvas'" @click="gantiMode('kanvas')">Kanvas</button>
               <button :aria-pressed="modeTampilan === 'kartu'" @click="gantiMode('kartu')">Kartu</button>
+              <button v-if="tingkat === 4" :aria-pressed="modeTampilan === 'teks'" @click="gantiMode('teks')">Teks</button>
             </div>
-            <div v-if="tingkat !== 1" class="templat">
+            <span v-else class="ket-mode-teks">🔒 Mode teks — permanen untuk karya ini</span>
+            <div v-if="tingkat !== 1 && modeTampilan !== 'teks'" class="templat">
               <span>Mulai dari templat:</span>
               <button v-for="t in TEMPLAT_TINGKAT_2" :key="t.id" class="tbl kecil hantu" @click="muatTemplat(t)">
                 {{ t.judul }}
@@ -475,14 +554,16 @@ onMounted(async () => {
           <span class="ket ket-blok">{{
             modeTampilan === 'kanvas'
               ? 'Tarik blok dari kiri, sambungkan di bawah blok bendera'
-              : 'Ketuk "+ tambah blok" untuk menyisipkan, panah untuk memindah urutan'
+              : modeTampilan === 'kartu'
+                ? 'Ketuk "+ tambah blok" untuk menyisipkan, panah untuk memindah urutan'
+                : 'Tulis kode lalu ketuk "Terapkan" — begitu diterapkan, karya ini permanen memakai teks (tidak bisa balik ke blok)'
           }}</span>
           <!-- Tingkat 3 (milestone 6.2, PRD 5): "panel kode baca-saja
                berdampingan" — bukan tab yang harus diklik pindah seperti
                tingkat lain, tapi selalu terlihat DI SAMPING kanvas blok,
                berubah langsung tiap blok disusun (change listener yang
                sama dengan yang sudah mengisi isiKode sejak milestone 1.4). -->
-          <div :class="{ 'blok-berdampingan': tingkat === 3 }">
+          <div v-if="modeTampilan !== 'teks'" :class="{ 'blok-berdampingan': tingkat === 3 }">
             <div v-show="modeTampilan === 'kanvas'" ref="kanvasBlok" class="kanvas-blok"></div>
             <ModeKartu
               v-if="modeTampilan === 'kartu'"
@@ -493,6 +574,22 @@ onMounted(async () => {
               :besar="tingkat === 1"
             />
             <pre v-if="tingkat === 3" class="kode kode-samping" aria-label="Kode JavaScript, berubah otomatis mengikuti blok">{{ isiKode }}</pre>
+          </div>
+          <!-- Mode teks (milestone 6.3, tingkat 4) — editor dua arah SATU
+               ARAH (lihat parserTeks.js): blok -> teks sekali saat masuk
+               mode ini, lalu teks yang dipakai seterusnya. -->
+          <div v-else class="editor-teks">
+            <textarea
+              v-model="teksProgram"
+              class="kotak-teks"
+              spellcheck="false"
+              aria-label="Editor kode — tulis lalu ketuk Terapkan"
+            ></textarea>
+            <div class="baris-terapkan">
+              <button class="tbl" @click="terapkanTeks">▶ Terapkan</button>
+              <span v-if="galatTeks" class="galat-teks">{{ galatTeks }}</span>
+              <span v-else-if="astTerkunci" class="ok-teks">✓ Kode ini yang dipakai Jalankan/Ekspor/Simpan.</span>
+            </div>
           </div>
         </section>
       </div>
@@ -836,6 +933,68 @@ onMounted(async () => {
     max-height: 260px;
     overflow: auto;
   }
+}
+
+/* Tingkat 4 (milestone 6.3) — "tema gelap, tata letak menyerupai editor
+   kode sungguhan". Cuma panel susun-blok yang gelap (bukan seluruh
+   halaman) — panggung & panel lain tetap terang supaya hasil karya (yang
+   dilihat teman/guru) tidak ikut berubah tampilannya. */
+.panel-gelap {
+  background: #171923;
+  color: #D7DDEC;
+}
+.panel-gelap .panel-kepala {
+  border-bottom-color: #2C3146;
+}
+.panel-gelap .judul {
+  color: #fff;
+}
+.panel-gelap .ket-blok,
+.panel-gelap .templat {
+  color: #9AA3C4;
+}
+.ket-mode-teks {
+  font-size: 13px;
+  font-weight: 600;
+  color: #F5B32E;
+}
+
+.editor-teks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 14px;
+  height: min(560px, calc(100vh - 280px));
+  min-height: 320px;
+}
+.kotak-teks {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  background: #11131C;
+  color: #D7E2FF;
+  border: 1px solid #2C3146;
+  border-radius: 10px;
+  padding: 14px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13.5px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+.baris-terapkan {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.galat-teks {
+  font-size: 12.5px;
+  color: #FF8080;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.ok-teks {
+  font-size: 12.5px;
+  color: #4ADE80;
 }
 
 .panggung-bungkus {

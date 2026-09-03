@@ -9,13 +9,23 @@ import { programAst } from '@otak-atik/blok'
 export const FORMAT_PROJEK = 'otak-atik'
 export const VERSI_PROJEK = 1
 
-export function berkasProjek(workspace) {
+// opsi.program/opsi.teksSumber (milestone 6.3, tingkat 4): kalau diisi,
+// `program` disimpan APA ADANYA (bukan dibaca ulang dari workspace
+// Blockly) dan teks sumbernya ikut disimpan supaya BISA DIPULIHKAN utuh
+// saat karya dibuka lagi (lihat App.vue:muatProjekKeEditor). Dipakai saat
+// karya sudah di "mode teks" (lihat App.vue:terapkanTeks) — begitu teks
+// mengambil alih permanen, workspace Blockly-nya beku/basi, jadi TANPA
+// teksSumber tersimpan, membuka lagi karya ini akan diam-diam kembali ke
+// blok basi dan kehilangan editan teksnya (aturan tetap #3 soal karya
+// lama harus tetap utuh berlaku juga untuk karya mode teks).
+export function berkasProjek(workspace, { program = null, teksSumber = null } = {}) {
   return {
     format: FORMAT_PROJEK,
     versi: VERSI_PROJEK,
     dibuat: new Date().toISOString(),
-    program: programAst(workspace),
+    program: program ?? programAst(workspace),
     blockly: Blockly.serialization.workspaces.save(workspace),
+    ...(teksSumber !== null ? { teksSumber } : {}),
   }
 }
 
@@ -30,8 +40,8 @@ export function unduhBerkas(nama, isi, tipe = 'application/json') {
   return blob.size
 }
 
-export function simpanProjek(workspace, nama = 'karyaku.json') {
-  const data = berkasProjek(workspace)
+export function simpanProjek(workspace, nama = 'karyaku.json', opsi = {}) {
+  const data = berkasProjek(workspace, opsi)
   return unduhBerkas(nama, JSON.stringify(data, null, 2))
 }
 
