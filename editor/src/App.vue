@@ -14,6 +14,7 @@ import {
   TIPE_BENDERA,
   TOOLBOX_TINGKAT_1,
   TOOLBOX_TINGKAT_2,
+  TOOLBOX_TINGKAT_3,
 } from '@otak-atik/blok'
 import { MISI_TINGKAT_1, MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
 import { bacaBerkasProjek, berkasProjek, muatProjek, simpanProjek } from './berkas'
@@ -33,11 +34,17 @@ import {
 import { TEMA_TINGKAT_1 } from './temaTingkat1'
 import { aturTtsBisu, bicarakan, ttsBisu } from './tts'
 
-// Tingkat dipilih lewat parameter URL (?tingkat=1), diteruskan dari iframe
-// server/resources/js/Pages/Editor.vue — milestone 6.1. Bawaan tingkat 2
-// (perilaku sebelum milestone ini, tidak berubah kalau parameter tidak ada).
-const tingkat = new URLSearchParams(window.location.search).get('tingkat') === '1' ? 1 : 2
-const toolboxAktif = tingkat === 1 ? TOOLBOX_TINGKAT_1 : TOOLBOX_TINGKAT_2
+// Tingkat dipilih lewat parameter URL (?tingkat=1|3), diteruskan dari
+// iframe server/resources/js/Pages/Editor.vue — milestone 6.1/6.2. Bawaan
+// tingkat 2 (perilaku sebelum milestone ini, tidak berubah kalau parameter
+// tidak ada atau nilainya tidak dikenali).
+const paramTingkat = new URLSearchParams(window.location.search).get('tingkat')
+const tingkat = paramTingkat === '1' ? 1 : paramTingkat === '3' ? 3 : 2
+const toolboxAktif = tingkat === 1 ? TOOLBOX_TINGKAT_1 : tingkat === 3 ? TOOLBOX_TINGKAT_3 : TOOLBOX_TINGKAT_2
+// Tingkat 3 (SMP) memakai misi tingkat 2 apa adanya — blok tingkat 3 adalah
+// SUPERSET tingkat 2 (semua blok tingkat 2 tetap ada), jadi setiap misi
+// tingkat 2 tetap bisa dikerjakan; belum ada misi baru yang KHUSUS
+// memakai blok tingkat 3 (fungsi/daftar/ekspresi) di milestone ini.
 const misiDaftar = tingkat === 1 ? MISI_TINGKAT_1 : MISI_TINGKAT_2
 const ttsBisuNow = ref(ttsBisu())
 function ubahBisuTts() {
@@ -412,7 +419,9 @@ onMounted(async () => {
       >
         {{ ttsBisuNow ? '🔇' : '🔊' }}
       </button>
-      <span class="lencana">{{ tingkat === 1 ? 'Tingkat 1 · SD kelas 1–3' : 'Tingkat 2 · SD kelas 4–6' }}</span>
+      <span class="lencana">{{
+        tingkat === 1 ? 'Tingkat 1 · SD kelas 1–3' : tingkat === 3 ? 'Tingkat 3 · SMP' : 'Tingkat 2 · SD kelas 4–6'
+      }}</span>
     </header>
 
     <main class="tiga-panel">
@@ -456,7 +465,7 @@ onMounted(async () => {
               <button :aria-pressed="modeTampilan === 'kanvas'" @click="gantiMode('kanvas')">Kanvas</button>
               <button :aria-pressed="modeTampilan === 'kartu'" @click="gantiMode('kartu')">Kartu</button>
             </div>
-            <div v-if="tingkat === 2" class="templat">
+            <div v-if="tingkat !== 1" class="templat">
               <span>Mulai dari templat:</span>
               <button v-for="t in TEMPLAT_TINGKAT_2" :key="t.id" class="tbl kecil hantu" @click="muatTemplat(t)">
                 {{ t.judul }}
@@ -468,15 +477,23 @@ onMounted(async () => {
               ? 'Tarik blok dari kiri, sambungkan di bawah blok bendera'
               : 'Ketuk "+ tambah blok" untuk menyisipkan, panah untuk memindah urutan'
           }}</span>
-          <div v-show="modeTampilan === 'kanvas'" ref="kanvasBlok" class="kanvas-blok"></div>
-          <ModeKartu
-            v-if="modeTampilan === 'kartu'"
-            class="kanvas-blok"
-            :kartu="kartuProgram"
-            :workspace="workspace"
-            :toolbox="toolboxAktif"
-            :besar="tingkat === 1"
-          />
+          <!-- Tingkat 3 (milestone 6.2, PRD 5): "panel kode baca-saja
+               berdampingan" — bukan tab yang harus diklik pindah seperti
+               tingkat lain, tapi selalu terlihat DI SAMPING kanvas blok,
+               berubah langsung tiap blok disusun (change listener yang
+               sama dengan yang sudah mengisi isiKode sejak milestone 1.4). -->
+          <div :class="{ 'blok-berdampingan': tingkat === 3 }">
+            <div v-show="modeTampilan === 'kanvas'" ref="kanvasBlok" class="kanvas-blok"></div>
+            <ModeKartu
+              v-if="modeTampilan === 'kartu'"
+              class="kanvas-blok"
+              :kartu="kartuProgram"
+              :workspace="workspace"
+              :toolbox="toolboxAktif"
+              :besar="tingkat === 1"
+            />
+            <pre v-if="tingkat === 3" class="kode kode-samping" aria-label="Kode JavaScript, berubah otomatis mengikuti blok">{{ isiKode }}</pre>
+          </div>
         </section>
       </div>
 
@@ -783,6 +800,42 @@ onMounted(async () => {
   height: min(620px, calc(100vh - 220px));
   min-height: 400px;
   width: 100%;
+}
+
+/* Tingkat 3 (milestone 6.2): kanvas blok & panel kode baca-saja
+   berdampingan, bukan bertumpuk/bertab — keduanya berbagi tinggi yang
+   sama persis dengan .kanvas-blok di atas. */
+.blok-berdampingan {
+  display: flex;
+  gap: 10px;
+  height: min(620px, calc(100vh - 220px));
+}
+.blok-berdampingan .kanvas-blok {
+  height: 100%;
+  flex: 1.3;
+  min-width: 0;
+}
+.kode-samping {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  max-height: none;
+  border: 1px solid var(--garis);
+  border-radius: 12px;
+}
+@media (max-width: 920px) {
+  .blok-berdampingan {
+    flex-direction: column;
+    height: auto;
+  }
+  .blok-berdampingan .kanvas-blok {
+    height: 56vh;
+    min-height: 320px;
+  }
+  .kode-samping {
+    max-height: 260px;
+    overflow: auto;
+  }
 }
 
 .panggung-bungkus {

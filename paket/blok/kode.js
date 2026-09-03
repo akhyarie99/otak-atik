@@ -5,6 +5,29 @@
 // — bukan kode yang benar-benar dieksekusi (eksekusi selalu lewat
 // interpreter AST, aturan tetap #2).
 
+// Simpul NILAI (angka) tingkat 3 — milestone 6.2. Angka polos dirender
+// apa adanya (kompatibel dengan seluruh kode tingkat 2 yang sudah ada).
+function kodeNilai(n) {
+  if (typeof n === 'number') return String(n)
+  if (!n) return '0'
+  switch (n.t) {
+    case 'var_nilai':
+      return n.nama
+    case 'posisi_x':
+      return 'panggung.sprite.x'
+    case 'posisi_y':
+      return 'panggung.sprite.y'
+    case 'daftar_panjang':
+      return `${n.nama}.length`
+    case 'acak':
+      return `acak(${kodeNilai(n.min)}, ${kodeNilai(n.maks)})`
+    case 'op_arit':
+      return `(${kodeNilai(n.kiri)} ${n.op} ${kodeNilai(n.kanan)})`
+    default:
+      return '0'
+  }
+}
+
 function kodeKondisi(n) {
   if (!n) return 'false'
   switch (n.t) {
@@ -14,6 +37,12 @@ function kodeKondisi(n) {
       return 'panggung.menyentuhSprite()'
     case 'tombol_ditekan':
       return `panggung.apakahTombolDitekan(${JSON.stringify(n.tombol)})`
+    case 'op_banding':
+      return `(${kodeNilai(n.kiri)} ${{ sama: '===', kurang: '<', lebih: '>' }[n.op] || '=='} ${kodeNilai(n.kanan)})`
+    case 'op_logika':
+      return `(${kodeKondisi(n.kiri)} ${n.op === 'dan' ? '&&' : '||'} ${kodeKondisi(n.kanan)})`
+    case 'op_bukan':
+      return `!(${kodeKondisi(n.nilai)})`
     default:
       return 'false'
   }
@@ -73,6 +102,18 @@ function kodeSatu(n, tab) {
       return `${t}${n.nama} += ${n.n};\n`
     case 'var_tampil':
       return `${t}panggung.tampilkanSkor("${n.nama}", ${n.nama});\n`
+    case 'ulangi_sampai':
+      return `${t}while (!(${kodeKondisi(n.kondisi)})) {\n${kodeUrutan(n.isi, tab + 1)}${t}}\n`
+    case 'daftar_buat':
+      return `${t}let ${n.nama} = [];\n`
+    case 'daftar_tambah':
+      return `${t}${n.nama}.push(${kodeNilai(n.nilai)});\n`
+    case 'daftar_tampil':
+      return `${t}panggung.tampilkanSkor("${n.nama}", ${n.nama}.join(", "));\n`
+    case 'deklarasi_fungsi':
+      return (n.daftar || []).map((f) => `${t}function ${f.nama}() {\n${kodeUrutan(f.isi, tab + 1)}${t}}\n`).join('')
+    case 'fungsi_panggil':
+      return `${t}${n.nama}();\n`
     default:
       return ''
   }

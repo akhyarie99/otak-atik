@@ -12,7 +12,42 @@ function angka(b, nm) {
   return Number.isNaN(v) ? 0 : v
 }
 
-// Blok Kondisi (nilai boolean) yang dicolokkan ke soket "jika"/"jika_lain".
+function namaVariabel(b) {
+  // field_variable menyimpan objek model variabel Blockly; ambil namanya
+  // sebagai kunci di peta variabel interpreter (lihat paket/runtime).
+  const v = b.getField('NAMA')?.getVariable?.()
+  return v ? v.name : b.getFieldValue('NAMA')
+}
+
+// Blok NILAI (angka) tingkat 3 (milestone 6.2) — dicolokkan ke soket
+// bertipe Number (operan operator, MIN/MAKS acak, dst). Blok kosong/belum
+// disambung menghasilkan angka polos 0, konsisten dengan angka() di atas.
+export function astNilai(b) {
+  if (!b) return 0
+  switch (b.type) {
+    case 't3_angka':
+      return angka(b, 'N')
+    case 't3_op_arit':
+      return { t: 'op_arit', op: b.getFieldValue('OP'), kiri: astNilai(b.getInputTargetBlock('A')), kanan: astNilai(b.getInputTargetBlock('B')) }
+    case 't3_acak':
+      return { t: 'acak', min: astNilai(b.getInputTargetBlock('MIN')), maks: astNilai(b.getInputTargetBlock('MAKS')) }
+    case 't3_var_nilai':
+      return { t: 'var_nilai', nama: namaVariabel(b) }
+    case 't3_posisi_x':
+      return { t: 'posisi_x' }
+    case 't3_posisi_y':
+      return { t: 'posisi_y' }
+    case 't3_daftar_panjang':
+      return { t: 'daftar_panjang', nama: namaVariabel(b) }
+    default:
+      return 0
+  }
+}
+
+// Blok Kondisi (nilai boolean) yang dicolokkan ke soket "jika"/"jika_lain"/
+// "ulangi sampai". Sejak milestone 6.2 juga menangani operator perbandingan
+// & logika tingkat 3 — operannya lewat astNilai (angka) / astKondisi
+// (boolean, rekursif) di atas.
 export function astKondisi(b) {
   if (!b) return null
   switch (b.type) {
@@ -22,16 +57,27 @@ export function astKondisi(b) {
       return { t: 'menyentuh_sprite', id: b.id }
     case 'tombol_ditekan':
       return { t: 'tombol_ditekan', tombol: b.getFieldValue('TOMBOL'), id: b.id }
+    case 't3_op_banding':
+      return {
+        t: 'op_banding',
+        op: b.getFieldValue('OP'),
+        kiri: astNilai(b.getInputTargetBlock('A')),
+        kanan: astNilai(b.getInputTargetBlock('B')),
+        id: b.id,
+      }
+    case 't3_op_logika':
+      return {
+        t: 'op_logika',
+        op: b.getFieldValue('OP'),
+        kiri: astKondisi(b.getInputTargetBlock('A')),
+        kanan: astKondisi(b.getInputTargetBlock('B')),
+        id: b.id,
+      }
+    case 't3_op_bukan':
+      return { t: 'op_bukan', nilai: astKondisi(b.getInputTargetBlock('A')), id: b.id }
     default:
       return null
   }
-}
-
-function namaVariabel(b) {
-  // field_variable menyimpan objek model variabel Blockly; ambil namanya
-  // sebagai kunci di peta variabel interpreter (lihat paket/runtime).
-  const v = b.getField('NAMA')?.getVariable?.()
-  return v ? v.name : b.getFieldValue('NAMA')
 }
 
 // Tipe blok tingkat 1 ('t1_...', milestone 6.1) ditambahkan ke case yang
@@ -97,6 +143,21 @@ export function astSatu(b) {
         isiLain: astUrutan(b.getInputTargetBlock('LAIN')),
         id: b.id,
       }
+    case 't3_ulangi_sampai':
+      return {
+        t: 'ulangi_sampai',
+        kondisi: astKondisi(b.getInputTargetBlock('KONDISI')),
+        isi: astUrutan(b.getInputTargetBlock('DO')),
+        id: b.id,
+      }
+    case 't3_daftar_buat':
+      return { t: 'daftar_buat', nama: namaVariabel(b), id: b.id }
+    case 't3_daftar_tambah':
+      return { t: 'daftar_tambah', nama: namaVariabel(b), nilai: astNilai(b.getInputTargetBlock('NILAI')), id: b.id }
+    case 't3_daftar_tampil':
+      return { t: 'daftar_tampil', nama: namaVariabel(b), id: b.id }
+    case 't3_fungsi_panggil':
+      return { t: 'fungsi_panggil', nama: b.getFieldValue('NAMA'), id: b.id }
     case 'atur_tampil':
       return { t: 'atur_tampil', tampak: b.getFieldValue('STATUS') === 'tampil', id: b.id }
     case 'ukuran':
@@ -132,6 +193,18 @@ export function astUrutan(b) {
 const TIPE_KEJADIAN = new Set(['ketika_bendera', 'ketika_tombol', 'ketika_disentuh', 't1_ketika_bendera'])
 export const TIPE_BENDERA = new Set(['ketika_bendera', 't1_ketika_bendera'])
 
+// Blok "fungsi ..." (t3_fungsi_buat, milestone 6.2) adalah skrip TOP-LEVEL
+// tersendiri (seperti ketika_tombol/ketika_disentuh) — bukan bagian rantai
+// bendera. Dikumpulkan terpisah di sini, lalu programAst() menaruhnya
+// sebagai simpul 'deklarasi_fungsi' PALING DEPAN (lihat interpreter.js)
+// supaya sudah terdaftar sebelum baris manapun sempat memanggilnya.
+export function programFungsi(workspace) {
+  return workspace
+    .getTopBlocks(true)
+    .filter((b) => b.type === 't3_fungsi_buat')
+    .map((b) => ({ nama: b.getFieldValue('NAMA'), isi: astUrutan(b.getNextBlock()) }))
+}
+
 // Program utama: hanya skrip di bawah "ketika bendera diklik" (atau
 // padanan tingkat 1-nya, "🏁 Mulai") yang dijalankan Interpreter sekarang.
 // Skrip "ketika tombol"/"ketika disentuh" terstruktur AST-nya juga (lihat
@@ -139,7 +212,10 @@ export const TIPE_BENDERA = new Set(['ketika_bendera', 't1_ketika_bendera'])
 // di luar milestone 1.4.
 export function programAst(workspace) {
   const bendera = workspace.getTopBlocks(true).find((b) => TIPE_BENDERA.has(b.type))
-  return bendera ? astUrutan(bendera.getNextBlock()) : []
+  const utama = bendera ? astUrutan(bendera.getNextBlock()) : []
+  const daftarFungsi = programFungsi(workspace)
+  if (daftarFungsi.length === 0) return utama
+  return [{ t: 'deklarasi_fungsi', daftar: daftarFungsi, id: 'deklarasi-fungsi' }, ...utama]
 }
 
 export function programSkripLain(workspace) {

@@ -27,16 +27,45 @@
 //   var_ubah    {t:'var_ubah', nama, n, id}        — variabel += n
 //   var_tampil  {t:'var_tampil', nama, id}         — tampilkan skor variabel
 //
-//   Simpul KONDISI (nilai boolean, dipakai di dalam jika/jika_lain, tidak
-//   pernah berdiri sendiri di urutan statement):
+//   --- Ditambah milestone 6.2 (tingkat 3) — lihat aturan tetap #3, daftar
+//   ini hanya bertambah, tidak pernah mengubah simpul di atas. ---
+//   ulangi_sampai   {t:'ulangi_sampai', kondisi, isi, id} — ulangi isi
+//                     SAMPAI kondisi benar (dicek sebelum tiap putaran)
+//   daftar_buat     {t:'daftar_buat', nama, id}        — vars[nama] = []
+//   daftar_tambah   {t:'daftar_tambah', nama, nilai, id} — vars[nama].push(nilai)
+//   daftar_tampil   {t:'daftar_tampil', nama, id}      — tampilkan isi daftar
+//   deklarasi_fungsi {t:'deklarasi_fungsi', daftar:[{nama,isi}], id} — daftarkan
+//                     fungsi buatan sendiri SEBELUM baris lain dijalankan;
+//                     selalu jadi simpul PERTAMA program kalau ada (lihat
+//                     paket/blok/ast.js:programAst) — bukan blok yang bisa
+//                     disusun anak sendiri, murni hasil konversi otomatis.
+//   fungsi_panggil  {t:'fungsi_panggil', nama, id}     — jalankan isi fungsi
+//                     bernama nama (tidak ada, diam-diam diabaikan)
+//
+//   Simpul NILAI (angka, dipakai di dalam operator/soket angka tingkat 3,
+//   tidak pernah berdiri sendiri di urutan statement) — dievaluasi murni
+//   lewat nilaiEkspresi(), bukan generator, karena bukan operasi panggung:
+//   var_nilai       {t:'var_nilai', nama}          — baca nilai variabel
+//   posisi_x/posisi_y {t:'posisi_x'} / {t:'posisi_y'} — posisi sprite sekarang
+//   daftar_panjang  {t:'daftar_panjang', nama}     — panjang daftar
+//   acak            {t:'acak', min, maks}          — bilangan bulat acak
+//   op_arit         {t:'op_arit', op, kiri, kanan} — op: '+' '-' '*' '/'
+//   (angka polos seperti 50 juga sah sebagai simpul nilai apa adanya)
+//
+//   Simpul KONDISI (nilai boolean, dipakai di dalam jika/jika_lain/
+//   ulangi_sampai, tidak pernah berdiri sendiri di urutan statement):
 //   menyentuh_warna  {t:'menyentuh_warna', w, id}
 //   menyentuh_sprite {t:'menyentuh_sprite', id}
 //   tombol_ditekan   {t:'tombol_ditekan', tombol, id}
+//   op_banding      {t:'op_banding', op, kiri, kanan} — op: 'sama' 'kurang' 'lebih'
+//   op_logika       {t:'op_logika', op, kiri, kanan}  — op: 'dan' 'atau'
+//   op_bukan        {t:'op_bukan', nilai}             — NOT logika
 //
-// PENGAMAN LOOP — aturan tetap #1: "ulangi" dan "selamanya" WAJIB yield di
-// setiap putaran, sebelum menjalankan isinya, walau isinya kosong. Itu
-// satu-satunya hal yang mencegah blok "ulangi selamanya" kosong membekukan
-// HP anak. Jangan pernah menghapus yield itu — lihat interpreter.test.js.
+// PENGAMAN LOOP — aturan tetap #1: "ulangi", "selamanya", DAN "ulangi_sampai"
+// WAJIB yield di setiap putaran, sebelum menjalankan isinya, walau isinya
+// kosong. Itu satu-satunya hal yang mencegah blok perulangan kosong
+// membekukan HP anak. Jangan pernah menghapus yield itu — lihat
+// interpreter.test.js.
 
 export const KECEPATAN = { lambat: 1, normal: 6, kilat: 400 }
 
@@ -45,9 +74,52 @@ function* jeda(ms, id) {
   while (performance.now() < sampai) yield { tipe: 'tunggu', id }
 }
 
+// Simpul NILAI (angka) tingkat 3 — dievaluasi langsung (bukan generator),
+// dianggap satu langkah atomik seperti reporter block di Scratch, tidak
+// yield sendiri. Angka polos dikembalikan apa adanya (kompatibel mundur:
+// n.n dkk yang selama ini SELALU angka polos tetap berfungsi tanpa berubah).
+export function nilaiEkspresi(n, panggung, vars) {
+  if (typeof n === 'number') return n
+  if (!n) return 0
+  switch (n.t) {
+    case 'var_nilai':
+      return vars.get(n.nama) ?? 0
+    case 'posisi_x':
+      return panggung.sprite.x
+    case 'posisi_y':
+      return panggung.sprite.y
+    case 'daftar_panjang':
+      return (vars.get(n.nama) || []).length
+    case 'acak': {
+      const min = Math.ceil(nilaiEkspresi(n.min, panggung, vars))
+      const maks = Math.floor(nilaiEkspresi(n.maks, panggung, vars))
+      if (maks < min) return min
+      return Math.floor(Math.random() * (maks - min + 1)) + min
+    }
+    case 'op_arit': {
+      const a = nilaiEkspresi(n.kiri, panggung, vars)
+      const b = nilaiEkspresi(n.kanan, panggung, vars)
+      switch (n.op) {
+        case '+':
+          return a + b
+        case '-':
+          return a - b
+        case '*':
+          return a * b
+        case '/':
+          return b === 0 ? 0 : a / b
+        default:
+          return 0
+      }
+    }
+    default:
+      return 0
+  }
+}
+
 // Simpul kondisi dievaluasi langsung (bukan generator) — dianggap satu
 // langkah atomik seperti reporter block di Scratch, tidak yield sendiri.
-export function evalKondisi(n, panggung) {
+export function evalKondisi(n, panggung, vars) {
   if (!n) return false
   switch (n.t) {
     case 'menyentuh_warna':
@@ -56,16 +128,36 @@ export function evalKondisi(n, panggung) {
       return panggung.menyentuhSprite()
     case 'tombol_ditekan':
       return panggung.apakahTombolDitekan(n.tombol)
+    case 'op_banding': {
+      const a = nilaiEkspresi(n.kiri, panggung, vars)
+      const b = nilaiEkspresi(n.kanan, panggung, vars)
+      switch (n.op) {
+        case 'sama':
+          return a === b
+        case 'kurang':
+          return a < b
+        case 'lebih':
+          return a > b
+        default:
+          return false
+      }
+    }
+    case 'op_logika':
+      if (n.op === 'dan') return evalKondisi(n.kiri, panggung, vars) && evalKondisi(n.kanan, panggung, vars)
+      if (n.op === 'atau') return evalKondisi(n.kiri, panggung, vars) || evalKondisi(n.kanan, panggung, vars)
+      return false
+    case 'op_bukan':
+      return !evalKondisi(n.nilai, panggung, vars)
     default:
       return false
   }
 }
 
-export function* jalankanUrutan(list, panggung, vars) {
-  for (const n of list || []) yield* jalankanSatu(n, panggung, vars)
+export function* jalankanUrutan(list, panggung, vars = new Map(), fungsi = new Map()) {
+  for (const n of list || []) yield* jalankanSatu(n, panggung, vars, fungsi)
 }
 
-export function* jalankanSatu(n, panggung, vars = new Map()) {
+export function* jalankanSatu(n, panggung, vars = new Map(), fungsi = new Map()) {
   switch (n.t) {
     case 'maju':
       panggung.maju(n.n)
@@ -124,23 +216,32 @@ export function* jalankanSatu(n, panggung, vars = new Map()) {
     case 'ulangi':
       for (let i = 0; i < n.n; i++) {
         yield { tipe: 'langkah', id: n.id }
-        yield* jalankanUrutan(n.isi, panggung, vars)
+        yield* jalankanUrutan(n.isi, panggung, vars, fungsi)
       }
       break
     case 'selamanya':
       while (true) {
         yield { tipe: 'langkah', id: n.id }
-        yield* jalankanUrutan(n.isi, panggung, vars)
+        yield* jalankanUrutan(n.isi, panggung, vars, fungsi)
       }
     // eslint-disable-next-line no-fallthrough -- selamanya tidak pernah selesai sendiri
+    case 'ulangi_sampai':
+      // Sama seperti "ulangi"/"selamanya": yield SEBELUM tiap putaran DAN
+      // sebelum evaluasi kondisi pertama, supaya "ulangi sampai salah()"
+      // tidak pernah membekukan HP anak (aturan tetap #1).
+      while (!evalKondisi(n.kondisi, panggung, vars)) {
+        yield { tipe: 'langkah', id: n.id }
+        yield* jalankanUrutan(n.isi, panggung, vars, fungsi)
+      }
+      break
     case 'jika':
       yield { tipe: 'langkah', id: n.id }
-      if (evalKondisi(n.kondisi, panggung)) yield* jalankanUrutan(n.isi, panggung, vars)
+      if (evalKondisi(n.kondisi, panggung, vars)) yield* jalankanUrutan(n.isi, panggung, vars, fungsi)
       break
     case 'jika_lain':
       yield { tipe: 'langkah', id: n.id }
-      if (evalKondisi(n.kondisi, panggung)) yield* jalankanUrutan(n.isi, panggung, vars)
-      else yield* jalankanUrutan(n.isiLain, panggung, vars)
+      if (evalKondisi(n.kondisi, panggung, vars)) yield* jalankanUrutan(n.isi, panggung, vars, fungsi)
+      else yield* jalankanUrutan(n.isiLain, panggung, vars, fungsi)
       break
     case 'atur_tampil':
       panggung.aturTampil(n.tampak)
@@ -170,6 +271,32 @@ export function* jalankanSatu(n, panggung, vars = new Map()) {
       panggung.tampilkanSkor(n.nama, vars.get(n.nama) ?? 0)
       yield { tipe: 'langkah', id: n.id }
       break
+    case 'daftar_buat':
+      vars.set(n.nama, [])
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'daftar_tambah':
+      if (!Array.isArray(vars.get(n.nama))) vars.set(n.nama, [])
+      vars.get(n.nama).push(nilaiEkspresi(n.nilai, panggung, vars))
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'daftar_tampil':
+      panggung.tampilkanSkor(n.nama, (vars.get(n.nama) || []).join(', '))
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'deklarasi_fungsi':
+      // Bukan langkah panggung sungguhan — cuma mendaftarkan isi fungsi ke
+      // peta `fungsi` (dipakai bersama sepanjang jalannya program lewat
+      // referensi Map yang sama) SEBELUM baris lain sempat memanggilnya.
+      for (const f of n.daftar || []) fungsi.set(f.nama, f.isi)
+      yield { tipe: 'langkah', id: n.id }
+      break
+    case 'fungsi_panggil': {
+      yield { tipe: 'langkah', id: n.id }
+      const isiFungsi = fungsi.get(n.nama)
+      if (isiFungsi) yield* jalankanUrutan(isiFungsi, panggung, vars, fungsi)
+      break
+    }
     default:
       yield { tipe: 'langkah', id: n.id }
   }
@@ -202,7 +329,8 @@ export class Interpreter {
     this.panggung.aturUlang()
     this.panggung.sembunyikanSkor()
     this.vars = new Map()
-    this.utas = jalankanUrutan(programAst, this.panggung, this.vars)
+    this.fungsi = new Map() // diisi oleh simpul 'deklarasi_fungsi' kalau ada (milestone 6.2)
+    this.utas = jalankanUrutan(programAst, this.panggung, this.vars, this.fungsi)
     this.jalan = true
     this._frameId = requestAnimationFrame(this._detak)
   }

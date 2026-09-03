@@ -505,16 +505,187 @@ export const DEFINISI_BLOK_TINGKAT_1 = [
   },
 ]
 
+// Blok tingkat 3 (SMP, milestone 6.2) — PRD 5: "~50 blok, fungsi buatan
+// sendiri, daftar, koordinat, panel kode baca-saja berdampingan". Tingkat 3
+// TIDAK butuh versi ikon-besar seperti tingkat 1 (audiensnya sudah lancar
+// membaca dan justru "malu memakai antarmuka anak kecil" — CLAUDE.md), jadi
+// toolboxnya memakai ULANG 30 blok DEFINISI_BLOK milik tingkat 2 apa adanya
+// dan cuma MENAMBAH ~17 blok baru di sini: ekspresi (operator angka/
+// perbandingan/logika — dicolok ke soket "jika" yang sudah ada), daftar
+// (list), fungsi buatan sendiri, dan "ulangi sampai". Simpul AST barunya
+// didokumentasikan di paket/runtime/interpreter.js — semuanya TAMBAHAN,
+// tidak mengubah simpul tingkat 2 manapun (aturan tetap #3).
+export const DEFINISI_BLOK_TINGKAT_3 = [
+  // --- Ekspresi angka (dicolok ke soket bertipe Number) ---
+  {
+    type: 't3_angka',
+    message0: '%1',
+    args0: [{ type: 'field_number', name: 'N', value: 0 }],
+    output: 'Number',
+    colour: WARNA.kontrol,
+    tooltip: 'Angka polos, bisa dicolok ke operator atau soket angka lain.',
+  },
+  {
+    type: 't3_op_arit',
+    message0: '%1 %2 %3',
+    args0: [
+      { type: 'input_value', name: 'A', check: 'Number' },
+      { type: 'field_dropdown', name: 'OP', options: [['+', '+'], ['−', '-'], ['×', '*'], ['÷', '/']] },
+      { type: 'input_value', name: 'B', check: 'Number' },
+    ],
+    inputsInline: true,
+    output: 'Number',
+    colour: WARNA.kontrol,
+  },
+  {
+    type: 't3_acak',
+    message0: 'acak antara %1 dan %2',
+    args0: [
+      { type: 'input_value', name: 'MIN', check: 'Number' },
+      { type: 'input_value', name: 'MAKS', check: 'Number' },
+    ],
+    inputsInline: true,
+    output: 'Number',
+    colour: WARNA.kontrol,
+  },
+  {
+    type: 't3_var_nilai',
+    message0: 'nilai %1',
+    args0: [{ type: 'field_variable', name: 'NAMA', variable: 'skor' }],
+    output: 'Number',
+    colour: WARNA.kontrol,
+  },
+  {
+    type: 't3_posisi_x',
+    message0: 'posisi x',
+    output: 'Number',
+    colour: WARNA.gerak,
+  },
+  {
+    type: 't3_posisi_y',
+    message0: 'posisi y',
+    output: 'Number',
+    colour: WARNA.gerak,
+  },
+
+  // --- Ekspresi boolean (dicolok ke soket "jika"/"jika_lain"/"ulangi sampai") ---
+  {
+    type: 't3_op_banding',
+    message0: '%1 %2 %3',
+    args0: [
+      { type: 'input_value', name: 'A', check: 'Number' },
+      { type: 'field_dropdown', name: 'OP', options: [['=', 'sama'], ['<', 'kurang'], ['>', 'lebih']] },
+      { type: 'input_value', name: 'B', check: 'Number' },
+    ],
+    inputsInline: true,
+    output: 'Boolean',
+    colour: WARNA.kontrol,
+  },
+  {
+    type: 't3_op_logika',
+    message0: '%1 %2 %3',
+    args0: [
+      { type: 'input_value', name: 'A', check: 'Boolean' },
+      { type: 'field_dropdown', name: 'OP', options: [['dan', 'dan'], ['atau', 'atau']] },
+      { type: 'input_value', name: 'B', check: 'Boolean' },
+    ],
+    inputsInline: true,
+    output: 'Boolean',
+    colour: WARNA.kontrol,
+  },
+  {
+    type: 't3_op_bukan',
+    message0: 'bukan %1',
+    args0: [{ type: 'input_value', name: 'A', check: 'Boolean' }],
+    inputsInline: true,
+    output: 'Boolean',
+    colour: WARNA.kontrol,
+  },
+
+  // --- Kontrol tambahan ---
+  {
+    type: 't3_ulangi_sampai',
+    message0: 'ulangi sampai %1',
+    message1: '%1',
+    args0: [{ type: 'input_value', name: 'KONDISI', check: 'Boolean' }],
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: WARNA.kontrol,
+  },
+
+  // --- Daftar (list) ---
+  {
+    type: 't3_daftar_buat',
+    message0: 'buat daftar %1 kosong',
+    args0: [{ type: 'field_variable', name: 'NAMA', variable: 'daftar' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: WARNA.pena,
+  },
+  {
+    type: 't3_daftar_tambah',
+    message0: 'tambah %1 ke daftar %2',
+    args0: [
+      { type: 'input_value', name: 'NILAI', check: 'Number' },
+      { type: 'field_variable', name: 'NAMA', variable: 'daftar' },
+    ],
+    inputsInline: true,
+    previousStatement: null,
+    nextStatement: null,
+    colour: WARNA.pena,
+  },
+  {
+    type: 't3_daftar_panjang',
+    message0: 'panjang daftar %1',
+    args0: [{ type: 'field_variable', name: 'NAMA', variable: 'daftar' }],
+    output: 'Number',
+    colour: WARNA.pena,
+  },
+  {
+    type: 't3_daftar_tampil',
+    message0: 'tampilkan daftar %1',
+    args0: [{ type: 'field_variable', name: 'NAMA', variable: 'daftar' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: WARNA.pena,
+  },
+
+  // --- Fungsi buatan sendiri (PRD 5) — tanpa parameter/nilai balik untuk
+  // versi pertama ini (lihat catatan milestone 6.2 di rencana-build.md/PR):
+  // memberi manfaat inti (nama + urutan blok bisa dipakai ulang) tanpa
+  // kerumitan mutator penambah-parameter Blockly yang jauh lebih besar. ---
+  {
+    type: 't3_fungsi_buat',
+    message0: 'fungsi %1',
+    message1: '%1',
+    args0: [{ type: 'field_input', name: 'NAMA', text: 'fungsiku' }],
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    nextStatement: null,
+    colour: WARNA.kejadian,
+    tooltip: 'Definisikan sekali, panggil berkali-kali lewat blok "panggil fungsi".',
+  },
+  {
+    type: 't3_fungsi_panggil',
+    message0: 'panggil fungsi %1',
+    args0: [{ type: 'field_input', name: 'NAMA', text: 'fungsiku' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: WARNA.kejadian,
+  },
+]
+
 export function daftarkanBlok() {
   Blockly.common.defineBlocks(Blockly.common.createBlockDefinitionsFromJsonArray(DEFINISI_BLOK))
   Blockly.common.defineBlocks(Blockly.common.createBlockDefinitionsFromJsonArray(DEFINISI_BLOK_TINGKAT_1))
+  Blockly.common.defineBlocks(Blockly.common.createBlockDefinitionsFromJsonArray(DEFINISI_BLOK_TINGKAT_3))
 }
 
 // --- Metadata generik dipakai mode kartu (milestone 3.1) untuk merender
 //     field & drawer tanpa menulis UI khusus per blok satu-satu. ---
 
 export const BLOK_PER_TIPE = Object.fromEntries(
-  [...DEFINISI_BLOK, ...DEFINISI_BLOK_TINGKAT_1].map((d) => [d.type, d]),
+  [...DEFINISI_BLOK, ...DEFINISI_BLOK_TINGKAT_1, ...DEFINISI_BLOK_TINGKAT_3].map((d) => [d.type, d]),
 )
 
 // Field yang bisa diedit langsung (field_number/field_input/field_dropdown/
@@ -690,6 +861,140 @@ export const TOOLBOX_TINGKAT_1 = {
       name: '🎵 Bunyi',
       colour: WARNA.suara,
       contents: [{ kind: 'block', type: 't1_bunyi' }],
+    },
+  ],
+}
+
+// Toolbox tingkat 3 (SMP, milestone 6.2) — 30 blok tingkat 2 dipakai ULANG
+// apa adanya (kategori Kejadian/Gerak/Kontrol/Kondisi/Variabel/Pena/
+// Tampilan/Suara identik), ditambah 3 kategori baru: Ekspresi (operator
+// angka/perbandingan/logika — blok reporter, ditarik ke SOKET seperti
+// "jika", bukan ditumpuk), Daftar, dan Fungsi. "ulangi sampai" masuk ke
+// kategori Kontrol yang sudah ada, bukan kategori sendiri.
+export const TOOLBOX_TINGKAT_3 = {
+  kind: 'categoryToolbox',
+  contents: [
+    {
+      kind: 'category',
+      name: 'Kejadian',
+      colour: WARNA.kejadian,
+      contents: [
+        { kind: 'block', type: 'ketika_bendera' },
+        { kind: 'block', type: 'ketika_tombol' },
+        { kind: 'block', type: 'ketika_disentuh' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Gerak',
+      colour: WARNA.gerak,
+      contents: [
+        { kind: 'block', type: 'maju' },
+        { kind: 'block', type: 'putar_kanan' },
+        { kind: 'block', type: 'putar_kiri' },
+        { kind: 'block', type: 'arahkan_ke' },
+        { kind: 'block', type: 'pergi_ke' },
+        { kind: 'block', type: 'pantul_tepi' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Kontrol',
+      colour: WARNA.kontrol,
+      contents: [
+        { kind: 'block', type: 'ulangi' },
+        { kind: 'block', type: 'selamanya' },
+        { kind: 'block', type: 't3_ulangi_sampai' },
+        { kind: 'block', type: 'tunggu' },
+        { kind: 'block', type: 'jika' },
+        { kind: 'block', type: 'jika_lain' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Kondisi',
+      colour: WARNA.kontrol,
+      contents: [
+        { kind: 'block', type: 'menyentuh_warna' },
+        { kind: 'block', type: 'menyentuh_sprite' },
+        { kind: 'block', type: 'tombol_ditekan' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Ekspresi',
+      colour: WARNA.kontrol,
+      contents: [
+        { kind: 'block', type: 't3_angka' },
+        { kind: 'block', type: 't3_op_arit' },
+        { kind: 'block', type: 't3_acak' },
+        { kind: 'block', type: 't3_var_nilai' },
+        { kind: 'block', type: 't3_posisi_x' },
+        { kind: 'block', type: 't3_posisi_y' },
+        { kind: 'block', type: 't3_op_banding' },
+        { kind: 'block', type: 't3_op_logika' },
+        { kind: 'block', type: 't3_op_bukan' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Variabel',
+      colour: WARNA.kontrol,
+      contents: [
+        { kind: 'block', type: 'var_atur' },
+        { kind: 'block', type: 'var_ubah' },
+        { kind: 'block', type: 'var_tampil' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Daftar',
+      colour: WARNA.pena,
+      contents: [
+        { kind: 'block', type: 't3_daftar_buat' },
+        { kind: 'block', type: 't3_daftar_tambah' },
+        { kind: 'block', type: 't3_daftar_panjang' },
+        { kind: 'block', type: 't3_daftar_tampil' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Pena',
+      colour: WARNA.pena,
+      contents: [
+        { kind: 'block', type: 'pena' },
+        { kind: 'block', type: 'warna_pena' },
+        { kind: 'block', type: 'hapus_gambar' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Tampilan',
+      colour: WARNA.tampilan,
+      contents: [
+        { kind: 'block', type: 'katakan' },
+        { kind: 'block', type: 'kostum' },
+        { kind: 'block', type: 'atur_tampil' },
+        { kind: 'block', type: 'ukuran' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Suara',
+      colour: WARNA.suara,
+      contents: [
+        { kind: 'block', type: 'bunyi' },
+        { kind: 'block', type: 'ucapkan' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: 'Fungsi',
+      colour: WARNA.kejadian,
+      contents: [
+        { kind: 'block', type: 't3_fungsi_buat' },
+        { kind: 'block', type: 't3_fungsi_panggil' },
+      ],
     },
   ],
 }
