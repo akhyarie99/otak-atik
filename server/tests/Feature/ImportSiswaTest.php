@@ -20,7 +20,10 @@ class ImportSiswaTest extends TestCase
 
     private function loginSebagaiGuru(): array
     {
-        $sekolah = Sekolah::factory()->create();
+        // Paket "sekolah" (siswa tak terbatas) — 300 siswa jelas di luar
+        // jangkauan paket Guru gratis (35 siswa, milestone 7.1/PRD 9.3)
+        // dengan sengaja; ini simulasi sekolah sungguhan yang membeli.
+        $sekolah = Sekolah::factory()->create(['paket' => 'sekolah']);
         $guru = User::factory()->create();
         $keanggotaan = Keanggotaan::create([
             'user_id' => $guru->id,

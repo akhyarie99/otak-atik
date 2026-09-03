@@ -67,14 +67,26 @@ class ImportSiswaController extends Controller
         $baris = Excel::toCollection(null, Storage::path($path))->first();
         $isi = $baris->slice(1); // baris pertama = judul kolom
 
+        // Kuota siswa aktif (milestone 7.1, PRD 9.3) — "yang diblokir hanya
+        // penambahan baru": impor tetap jalan sampai SISA slot habis,
+        // bukan ditolak semuanya, supaya guru yang mengimpor 40 nama
+        // dengan kuota 35 tetap dapat 35 akun, bukan nol.
+        $sisaSlot = $kelas->sekolah->sisaSlotSiswa();
         $dibuat = [];
+        $dilewatiKuota = 0;
 
-        DB::transaction(function () use ($isi, $data, $kelas, &$dibuat) {
+        DB::transaction(function () use ($isi, $data, $kelas, &$dibuat, &$sisaSlot, &$dilewatiKuota) {
             foreach ($isi as $baris) {
                 $nama = trim((string) ($baris[$data['kolom_nama']] ?? ''));
                 if ($nama === '') {
                     continue;
                 }
+
+                if ($sisaSlot !== null && $sisaSlot <= 0) {
+                    $dilewatiKuota++;
+                    continue;
+                }
+                if ($sisaSlot !== null) $sisaSlot--;
 
                 $pin = KodeGenerator::pin();
 
@@ -104,6 +116,7 @@ class ImportSiswaController extends Controller
             'jumlah_dibuat' => count($dibuat),
             'siswa' => $dibuat,
             'kode_kelas' => $kelas->kode_kelas,
+            'jumlah_dilewati_kuota' => $dilewatiKuota,
         ]);
     }
 }

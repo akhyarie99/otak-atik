@@ -70,6 +70,9 @@ async function prosesImpor() {
         <div class="py-12">
             <div class="mx-auto max-w-4xl space-y-6 sm:px-6 lg:px-8">
                 <div class="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg dark:bg-gray-800">
+                    <p v-if="formKelas.errors.kuota" class="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        {{ formKelas.errors.kuota }}
+                    </p>
                     <form class="flex flex-wrap items-end gap-3" @submit.prevent="buatKelas">
                         <div>
                             <label class="block text-sm text-gray-600 dark:text-gray-400">Nama kelas</label>
@@ -152,6 +155,10 @@ async function prosesImpor() {
                     <div v-if="hasilImpor" class="mt-4">
                         <p class="font-semibold text-emerald-700 dark:text-emerald-400">
                             {{ hasilImpor.jumlah_dibuat }} akun siswa berhasil dibuat. Kode kelas: <span class="font-mono">{{ hasilImpor.kode_kelas }}</span>
+                        </p>
+                        <p v-if="hasilImpor.jumlah_dilewati_kuota > 0" class="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            {{ hasilImpor.jumlah_dilewati_kuota }} nama TIDAK diimpor karena kuota siswa paket ini sudah tercapai.
+                            Hubungi admin untuk meningkatkan paket, lalu impor sisanya.
                         </p>
                         <table class="mt-3 w-full text-left text-xs">
                             <thead><tr><th class="p-2">Nama panggilan</th><th class="p-2">PIN</th></tr></thead>

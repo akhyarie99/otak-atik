@@ -26,7 +26,18 @@ class KelasController extends Controller
 
     public function store(Request $request): \Illuminate\Http\RedirectResponse
     {
-        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+        $keanggotaan = $request->attributes->get('keanggotaan_aktif');
+        abort_unless($keanggotaan->peran->bolehKelolaSekolah(), 403);
+
+        // Kuota kelas (milestone 7.1, PRD 9.3) — "yang diblokir hanya
+        // penambahan baru", jadi ditolak di SINI (sebelum kelas baru
+        // dibuat), bukan mengunci kelas yang sudah ada.
+        $sekolah = $keanggotaan->sekolah;
+        if (! $sekolah->bolehTambahKelas()) {
+            return back()->withErrors([
+                'kuota' => "Paket {$sekolah->paket->label()} sudah mencapai batas {$sekolah->batasKelas()} kelas. Hubungi admin untuk meningkatkan paket.",
+            ]);
+        }
 
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],

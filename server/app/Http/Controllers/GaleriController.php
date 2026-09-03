@@ -131,6 +131,17 @@ class GaleriController extends Controller
 
         $keanggotaan = $this->keanggotaanAktif($request);
 
+        // Kuota karya per siswa (milestone 7.1, PRD 9.3) — cuma dicek di
+        // sini (bukan di autosave biasa) karena remix adalah SATU-SATUNYA
+        // jalan siswa memiliki lebih dari satu baris karya (lihat catatan
+        // milestone 5.2 di KaryaController). Autosave karya "aktif"
+        // biasa tidak pernah menambah baris baru, jadi tidak perlu dicek.
+        $batas = $keanggotaan->sekolah->batasKaryaPerSiswa();
+        if ($batas !== null) {
+            $jumlahKaryaSaya = Karya::where('keanggotaan_id', $keanggotaan->id)->count();
+            abort_if($jumlahKaryaSaya >= $batas, 422, "Kuota {$batas} karya untuk paket ini sudah tercapai — hapus atau minta guru meningkatkan paket dulu.");
+        }
+
         $remix = Karya::create([
             'keanggotaan_id' => $keanggotaan->id,
             'judul' => $karya->judul,
