@@ -2,19 +2,25 @@
 import KartuBaris from './KartuBaris.vue'
 import KartuSisip from './KartuSisip.vue'
 
+import { TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
+
 const props = defineProps({
   kartu: { type: Array, required: true },
   workspace: { type: Object, default: null },
+  toolbox: { type: Object, default: () => TOOLBOX_TINGKAT_2 },
+  besar: { type: Boolean, default: false },
 })
 </script>
 
 <template>
   <div class="mode-kartu">
-    <p v-if="kartu.length === 0" class="kosong">Belum ada blok. Mulai dengan "ketika bendera diklik" di bawah.</p>
-    <KartuSisip :daftar="kartu" :posisi="0" konteks="atas" />
+    <p v-if="kartu.length === 0" class="kosong">
+      {{ besar ? 'Belum ada blok. Mulai dengan 🏁 Mulai di bawah.' : 'Belum ada blok. Mulai dengan "ketika bendera diklik" di bawah.' }}
+    </p>
+    <KartuSisip :daftar="kartu" :posisi="0" konteks="atas" :toolbox="toolbox" :besar="besar" />
     <template v-for="(k, i) in kartu" :key="k.id">
-      <KartuBaris :kartu="k" :daftar-induk="kartu" :indeks="i" :workspace="workspace" />
-      <KartuSisip :daftar="kartu" :posisi="i + 1" konteks="atas" />
+      <KartuBaris :kartu="k" :daftar-induk="kartu" :indeks="i" :workspace="workspace" :toolbox="toolbox" :besar="besar" />
+      <KartuSisip :daftar="kartu" :posisi="i + 1" konteks="atas" :toolbox="toolbox" :besar="besar" />
     </template>
   </div>
 </template>

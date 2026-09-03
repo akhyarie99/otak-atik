@@ -34,14 +34,25 @@ function namaVariabel(b) {
   return v ? v.name : b.getFieldValue('NAMA')
 }
 
+// Tipe blok tingkat 1 ('t1_...', milestone 6.1) ditambahkan ke case yang
+// SAMA dengan padanan tingkat 2-nya di bawah — keduanya menghasilkan
+// simpul AST yang identik (aturan tetap #3: format AST hanya boleh
+// ditambah, tidak diubah). Dua kasus TIDAK punya padanan field yang sama
+// persis karena field derajatnya sengaja dihilangkan di tingkat 1 (lihat
+// definisi.js) — belok kanan/kiri di tingkat 1 selalu seperempat putaran.
 export function astSatu(b) {
   switch (b.type) {
     case 'maju':
+    case 't1_maju':
       return { t: 'maju', n: angka(b, 'N'), id: b.id }
     case 'putar_kanan':
       return { t: 'putar', n: angka(b, 'N'), id: b.id }
     case 'putar_kiri':
       return { t: 'putar', n: -angka(b, 'N'), id: b.id }
+    case 't1_putar_kanan':
+      return { t: 'putar', n: 90, id: b.id }
+    case 't1_putar_kiri':
+      return { t: 'putar', n: -90, id: b.id }
     case 'arahkan_ke':
       return { t: 'arahkan', n: angka(b, 'N'), id: b.id }
     case 'pergi_ke':
@@ -49,18 +60,25 @@ export function astSatu(b) {
     case 'pantul_tepi':
       return { t: 'pantul', id: b.id }
     case 'pena':
+    case 't1_pena':
       return { t: 'pena', turun: b.getFieldValue('AKSI') === 'turun', id: b.id }
     case 'warna_pena':
+    case 't1_warna_pena':
       return { t: 'warna', w: b.getFieldValue('W'), id: b.id }
     case 'hapus_gambar':
+    case 't1_hapus_gambar':
       return { t: 'hapus', id: b.id }
     case 'katakan':
+    case 't1_katakan':
       return { t: 'katakan', teks: b.getFieldValue('TEKS'), n: angka(b, 'N'), id: b.id }
     case 'ucapkan':
+    case 't1_ucapkan':
       return { t: 'ucapkan', teks: b.getFieldValue('TEKS'), id: b.id }
     case 'tunggu':
+    case 't1_tunggu':
       return { t: 'tunggu', n: angka(b, 'N'), id: b.id }
     case 'ulangi':
+    case 't1_ulangi':
       return { t: 'ulangi', n: Math.floor(angka(b, 'N')), isi: astUrutan(b.getInputTargetBlock('DO')), id: b.id }
     case 'selamanya':
       return { t: 'selamanya', isi: astUrutan(b.getInputTargetBlock('DO')), id: b.id }
@@ -86,6 +104,7 @@ export function astSatu(b) {
     case 'kostum':
       return { t: 'kostum', nama: b.getFieldValue('NAMA'), id: b.id }
     case 'bunyi':
+    case 't1_bunyi':
       return { t: 'bunyi', nama: b.getFieldValue('NAMA'), id: b.id }
     case 'var_atur':
       return { t: 'var_atur', nama: namaVariabel(b), n: angka(b, 'N'), id: b.id }
@@ -110,20 +129,22 @@ export function astUrutan(b) {
   return out
 }
 
-const TIPE_KEJADIAN = new Set(['ketika_bendera', 'ketika_tombol', 'ketika_disentuh'])
+const TIPE_KEJADIAN = new Set(['ketika_bendera', 'ketika_tombol', 'ketika_disentuh', 't1_ketika_bendera'])
+export const TIPE_BENDERA = new Set(['ketika_bendera', 't1_ketika_bendera'])
 
-// Program utama: hanya skrip di bawah "ketika bendera diklik" yang
-// dijalankan Interpreter sekarang. Skrip "ketika tombol"/"ketika disentuh"
-// terstruktur AST-nya juga (lihat programSkripLain), tapi penjadwalan
-// paralelnya adalah pekerjaan lanjutan di luar milestone 1.4.
+// Program utama: hanya skrip di bawah "ketika bendera diklik" (atau
+// padanan tingkat 1-nya, "🏁 Mulai") yang dijalankan Interpreter sekarang.
+// Skrip "ketika tombol"/"ketika disentuh" terstruktur AST-nya juga (lihat
+// programSkripLain), tapi penjadwalan paralelnya adalah pekerjaan lanjutan
+// di luar milestone 1.4.
 export function programAst(workspace) {
-  const bendera = workspace.getTopBlocks(true).find((b) => b.type === 'ketika_bendera')
+  const bendera = workspace.getTopBlocks(true).find((b) => TIPE_BENDERA.has(b.type))
   return bendera ? astUrutan(bendera.getNextBlock()) : []
 }
 
 export function programSkripLain(workspace) {
   return workspace
     .getTopBlocks(true)
-    .filter((b) => TIPE_KEJADIAN.has(b.type) && b.type !== 'ketika_bendera')
+    .filter((b) => TIPE_KEJADIAN.has(b.type) && !TIPE_BENDERA.has(b.type))
     .map((b) => ({ pemicu: b.type, tombol: b.getFieldValue?.('TOMBOL'), isi: astUrutan(b.getNextBlock()) }))
 }

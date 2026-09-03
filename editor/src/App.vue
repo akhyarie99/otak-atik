@@ -5,14 +5,17 @@ import * as LokalId from 'blockly/msg/id'
 import 'blockly/blocks'
 import { Interpreter, Panggung } from '@otak-atik/runtime'
 import {
+  BLOK_PER_TIPE,
   blocklyKeKartu,
   daftarkanBlok,
   kartuKeBlockly,
   kodeProgram,
   programAst as bangunProgramAst,
+  TIPE_BENDERA,
+  TOOLBOX_TINGKAT_1,
   TOOLBOX_TINGKAT_2,
 } from '@otak-atik/blok'
-import { MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
+import { MISI_TINGKAT_1, MISI_TINGKAT_2, periksaMisi, TEMPLAT_TINGKAT_2 } from '@otak-atik/misi'
 import { bacaBerkasProjek, berkasProjek, muatProjek, simpanProjek } from './berkas'
 import { unduhEksporHtml } from './ekspor'
 import ModeKartu from './ModeKartu.vue'
@@ -27,6 +30,72 @@ import {
   siapSinkron,
   tarikDariAwan,
 } from './sinkronAwan'
+import { TEMA_TINGKAT_1 } from './temaTingkat1'
+import { aturTtsBisu, bicarakan, ttsBisu } from './tts'
+
+// Tingkat dipilih lewat parameter URL (?tingkat=1), diteruskan dari iframe
+// server/resources/js/Pages/Editor.vue — milestone 6.1. Bawaan tingkat 2
+// (perilaku sebelum milestone ini, tidak berubah kalau parameter tidak ada).
+const tingkat = new URLSearchParams(window.location.search).get('tingkat') === '1' ? 1 : 2
+const toolboxAktif = tingkat === 1 ? TOOLBOX_TINGKAT_1 : TOOLBOX_TINGKAT_2
+const misiDaftar = tingkat === 1 ? MISI_TINGKAT_1 : MISI_TINGKAT_2
+const ttsBisuNow = ref(ttsBisu())
+function ubahBisuTts() {
+  ttsBisuNow.value = !ttsBisuNow.value
+  aturTtsBisu(ttsBisuNow.value)
+}
+
+function ucapanBlok(type) {
+  return BLOK_PER_TIPE[type]?.ucapan || null
+}
+
+// TTS "baca label saat disentuh" (PRD 4.1, wajib di tingkat 1) — dipasang
+// di WORKSPACE UTAMA dan WORKSPACE FLYOUT (drawer toolbox) secara
+// terpisah, karena keduanya adalah instance Blockly.Workspace yang
+// berbeda; flyout baru ada setelah kategori pertama dibuka, jadi dipasang
+// ulang (aman diulang lewat penanda __ttsTerpasang) tiap kategori diklik.
+// CLICK saja tidak cukup: menyentuh blok di drawer flyout (Blockly zelos)
+// biasanya langsung menaruhnya ke kanvas dalam satu gestur "ketuk", yang
+// menghasilkan event SELECTED (lewat newElementId), BUKAN CLICK — dibuktikan
+// lewat pengamatan langsung di browser saat verifikasi milestone 6.1.
+// CLICK tetap didengarkan juga untuk kasus menyentuh blok yang sudah ada
+// di kanvas tanpa menggesernya sama sekali (situasi yang tidak memicu
+// SELECTED baru kalau bloknya memang sudah terpilih sebelumnya).
+// Gestur "ketuk" flyout sering memicu beberapa event SELECTED berturut-turut
+// untuk blok yang SAMA (pilih di flyout, lalu terpilih lagi setelah disalin
+// ke kanvas) — dijaga di sini supaya TTS-nya tidak mengulang kata yang sama
+// 2-3 kali dalam sepersekian detik (diamati langsung saat verifikasi 6.1).
+let idBlokTerakhirDiucapkan = null
+let waktuUcapTerakhir = 0
+function dengarKetukUntukTts(ws) {
+  return (e) => {
+    let idBlok = null
+    if (e.type === Blockly.Events.CLICK && e.targetType === 'block') idBlok = e.blockId
+    else if (e.type === Blockly.Events.SELECTED && e.newElementId) idBlok = e.newElementId
+    if (!idBlok) return
+    const sekarang = Date.now()
+    if (idBlok === idBlokTerakhirDiucapkan && sekarang - waktuUcapTerakhir < 600) return
+    const blok = ws.getBlockById(idBlok)
+    if (!blok) return
+    idBlokTerakhirDiucapkan = idBlok
+    waktuUcapTerakhir = sekarang
+    bicarakan(ucapanBlok(blok.type))
+  }
+}
+function pasangTtsKetukBlok(ws) {
+  ws.addChangeListener(dengarKetukUntukTts(ws))
+  const pasangFlyout = () => {
+    const fw = ws.getFlyout?.()?.getWorkspace?.()
+    if (fw && !fw.__ttsTerpasang) {
+      fw.addChangeListener(dengarKetukUntukTts(fw))
+      fw.__ttsTerpasang = true
+    }
+  }
+  pasangFlyout()
+  ws.addChangeListener((e) => {
+    if (e.type === Blockly.Events.TOOLBOX_ITEM_SELECT) pasangFlyout()
+  })
+}
 
 const kanvasBlok = ref(null)
 const kanvasPanggung = ref(null)
@@ -49,13 +118,13 @@ const kecepatan = ref('normal')
 const pesanJalan = ref('')
 
 const misiIndeks = ref(0)
-const misiAktif = ref(MISI_TINGKAT_2[0])
+const misiAktif = ref(misiDaftar[0])
 const misiLulus = ref(new Set())
 const hasilPeriksa = ref(null)
 
 function pilihMisi(i) {
   misiIndeks.value = i
-  misiAktif.value = MISI_TINGKAT_2[i]
+  misiAktif.value = misiDaftar[i]
   hasilPeriksa.value = null
 }
 
@@ -169,9 +238,12 @@ function sorotBlok(id) {
 }
 
 function jalankan() {
-  const bendera = workspace.value.getTopBlocks(true).find((b) => b.type === 'ketika_bendera')
+  const bendera = workspace.value.getTopBlocks(true).find((b) => TIPE_BENDERA.has(b.type))
   if (!bendera) {
-    pesanJalan.value = 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
+    pesanJalan.value =
+      tingkat === 1
+        ? 'Belum ada blok "🏁 Mulai". Tarik dulu dari kategori Mulai.'
+        : 'Belum ada blok "ketika bendera diklik". Tarik dulu dari kategori Kejadian.'
     return
   }
   pesanJalan.value = ''
@@ -258,17 +330,19 @@ onMounted(async () => {
   daftarkanBlok()
 
   workspace.value = Blockly.inject(kanvasBlok.value, {
-    toolbox: TOOLBOX_TINGKAT_2,
+    toolbox: toolboxAktif,
     renderer: 'zelos',
     trashcan: true,
     sounds: false,
-    zoom: { controls: true, wheel: true, startScale: 0.85, minScale: 0.5, maxScale: 1.6 },
+    theme: tingkat === 1 ? TEMA_TINGKAT_1 : undefined,
+    zoom: { controls: true, wheel: true, startScale: tingkat === 1 ? 1.1 : 0.85, minScale: 0.5, maxScale: 1.6 },
     move: { scrollbars: true, drag: true, wheel: true },
     grid: { spacing: 26, length: 2, colour: '#E4E9F5', snap: false },
   })
 
   workspace.value.addChangeListener(simpanKeJson)
   workspace.value.addChangeListener(jadwalkanAutosave)
+  if (tingkat === 1) pasangTtsKetukBlok(workspace.value)
   simpanKeJson()
 
   // Layar HP (< 768px, sama dengan batas PRD 6.1 untuk mode kanvas) —
@@ -329,7 +403,16 @@ onMounted(async () => {
         <h1>Otak-atik</h1>
         <p>Editor · kerangka fase 1</p>
       </div>
-      <span class="lencana">Tingkat 2 · SD kelas 4–6</span>
+      <button
+        v-if="tingkat === 1"
+        class="tombol-bisu"
+        :aria-pressed="ttsBisuNow"
+        :title="ttsBisuNow ? 'Suara mati — ketuk untuk menyalakan' : 'Suara menyala — ketuk untuk mematikan'"
+        @click="ubahBisuTts"
+      >
+        {{ ttsBisuNow ? '🔇' : '🔊' }}
+      </button>
+      <span class="lencana">{{ tingkat === 1 ? 'Tingkat 1 · SD kelas 1–3' : 'Tingkat 2 · SD kelas 4–6' }}</span>
     </header>
 
     <main class="tiga-panel">
@@ -337,7 +420,7 @@ onMounted(async () => {
         <section class="panel panel-misi">
           <div class="misi-daftar" role="group" aria-label="Pilih misi">
             <button
-              v-for="(m, i) in MISI_TINGKAT_2"
+              v-for="(m, i) in misiDaftar"
               :key="m.id"
               class="misi-chip"
               :class="{ tuntas: misiLulus.has(m.id) }"
@@ -373,7 +456,7 @@ onMounted(async () => {
               <button :aria-pressed="modeTampilan === 'kanvas'" @click="gantiMode('kanvas')">Kanvas</button>
               <button :aria-pressed="modeTampilan === 'kartu'" @click="gantiMode('kartu')">Kartu</button>
             </div>
-            <div class="templat">
+            <div v-if="tingkat === 2" class="templat">
               <span>Mulai dari templat:</span>
               <button v-for="t in TEMPLAT_TINGKAT_2" :key="t.id" class="tbl kecil hantu" @click="muatTemplat(t)">
                 {{ t.judul }}
@@ -386,7 +469,14 @@ onMounted(async () => {
               : 'Ketuk "+ tambah blok" untuk menyisipkan, panah untuk memindah urutan'
           }}</span>
           <div v-show="modeTampilan === 'kanvas'" ref="kanvasBlok" class="kanvas-blok"></div>
-          <ModeKartu v-if="modeTampilan === 'kartu'" class="kanvas-blok" :kartu="kartuProgram" :workspace="workspace" />
+          <ModeKartu
+            v-if="modeTampilan === 'kartu'"
+            class="kanvas-blok"
+            :kartu="kartuProgram"
+            :workspace="workspace"
+            :toolbox="toolboxAktif"
+            :besar="tingkat === 1"
+          />
         </section>
       </div>
 
@@ -502,6 +592,22 @@ onMounted(async () => {
   font-size: 12.5px;
   color: #dde3f7;
   font-weight: 500;
+}
+.tombol-bisu {
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+/* Kalau lencana tingkat juga ada, tombol bisu tidak perlu dorong sendiri. */
+.tombol-bisu + .lencana {
+  margin-left: 0;
 }
 
 .tiga-panel {

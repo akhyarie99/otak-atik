@@ -1,7 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { BLOK_PER_TIPE, daftarFieldBlok } from '@otak-atik/blok'
+import { BLOK_PER_TIPE, daftarFieldBlok, TOOLBOX_TINGKAT_2 } from '@otak-atik/blok'
 import KartuSisip from './KartuSisip.vue'
+import { bicarakan } from './tts'
 
 defineOptions({ name: 'KartuBaris' })
 
@@ -11,6 +12,8 @@ const props = defineProps({
   indeks: { type: Number, required: true },
   workspace: { type: Object, default: null },
   bolehGeser: { type: Boolean, default: true },
+  toolbox: { type: Object, default: () => TOOLBOX_TINGKAT_2 },
+  besar: { type: Boolean, default: false },
 })
 
 const def = computed(() => BLOK_PER_TIPE[props.kartu.type] || {})
@@ -18,6 +21,13 @@ const field = computed(() => daftarFieldBlok(props.kartu.type))
 
 function labelDasar() {
   return (def.value.message0 || props.kartu.type).replace(/%\d/g, '').trim()
+}
+
+// Tingkat 1 (milestone 6.1): ketuk baris yang SUDAH ada di programnya
+// juga membacakan namanya — anak sering menengok ulang urutan blok yang
+// sudah disusun, bukan cuma saat memilih dari drawer.
+function ketukBaris() {
+  if (besar) bicarakan(def.value.ucapan || null)
 }
 
 function naik() {
@@ -46,9 +56,9 @@ function hapusKondisi() {
 </script>
 
 <template>
-  <div class="baris" :style="{ borderLeftColor: def.colour || '#ccc' }">
+  <div class="baris" :class="{ besar }" :style="{ borderLeftColor: def.colour || '#ccc' }">
     <div class="isi">
-      <span class="tipe">{{ labelDasar() }}</span>
+      <span class="tipe" :class="{ ketuk: besar }" @click="ketukBaris">{{ labelDasar() }}</span>
       <template v-for="f in field" :key="f.name">
         <input
           v-if="f.type === 'field_number'"
@@ -88,18 +98,20 @@ function hapusKondisi() {
           :indeks="0"
           :workspace="workspace"
           :boleh-geser="false"
+          :toolbox="toolbox"
+          :besar="besar"
         />
         <button type="button" class="hapus-kecil" @click="hapusKondisi">✕</button>
       </template>
-      <KartuSisip v-else :daftar="{ splice: (i, n, k) => (kartu.kondisi = k) }" :posisi="0" konteks="kondisi" />
+      <KartuSisip v-else :daftar="{ splice: (i, n, k) => (kartu.kondisi = k) }" :posisi="0" konteks="kondisi" :toolbox="toolbox" :besar="besar" />
     </div>
 
     <!-- Isi "DO" -->
     <div v-if="'do' in kartu" class="soket soket-badan">
-      <KartuSisip :daftar="kartu.do" :posisi="0" konteks="badan" />
+      <KartuSisip :daftar="kartu.do" :posisi="0" konteks="badan" :toolbox="toolbox" :besar="besar" />
       <template v-for="(k, i) in kartu.do" :key="k.id">
-        <KartuBaris :kartu="k" :daftar-induk="kartu.do" :indeks="i" :workspace="workspace" />
-        <KartuSisip :daftar="kartu.do" :posisi="i + 1" konteks="badan" />
+        <KartuBaris :kartu="k" :daftar-induk="kartu.do" :indeks="i" :workspace="workspace" :toolbox="toolbox" :besar="besar" />
+        <KartuSisip :daftar="kartu.do" :posisi="i + 1" konteks="badan" :toolbox="toolbox" :besar="besar" />
       </template>
     </div>
 
@@ -107,10 +119,10 @@ function hapusKondisi() {
     <template v-if="'lain' in kartu">
       <div class="label-lain">kalau tidak:</div>
       <div class="soket soket-badan">
-        <KartuSisip :daftar="kartu.lain" :posisi="0" konteks="badan" />
+        <KartuSisip :daftar="kartu.lain" :posisi="0" konteks="badan" :toolbox="toolbox" :besar="besar" />
         <template v-for="(k, i) in kartu.lain" :key="k.id">
-          <KartuBaris :kartu="k" :daftar-induk="kartu.lain" :indeks="i" :workspace="workspace" />
-          <KartuSisip :daftar="kartu.lain" :posisi="i + 1" konteks="badan" />
+          <KartuBaris :kartu="k" :daftar-induk="kartu.lain" :indeks="i" :workspace="workspace" :toolbox="toolbox" :besar="besar" />
+          <KartuSisip :daftar="kartu.lain" :posisi="i + 1" konteks="badan" :toolbox="toolbox" :besar="besar" />
         </template>
       </div>
     </template>
@@ -204,6 +216,31 @@ function hapusKondisi() {
   background: transparent;
   color: #e14b4b;
   cursor: pointer;
+}
+.tipe.ketuk {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* Tingkat 1 (milestone 6.1) — target sentuh >= 56px SELALU, bukan cuma
+   di layar HP; blok besar & sedikit itu poinnya (rencana-build.md 6.1). */
+.baris.besar {
+  border-left-width: 10px;
+  padding: 12px 14px;
+}
+.baris.besar .tipe {
+  font-size: 18px;
+  font-weight: 700;
+}
+.baris.besar .bidang {
+  min-height: 44px;
+  font-size: 16px;
+}
+.baris.besar .aksi button {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
 }
 
 /* Target sentuh >= 56px di layar HP — milestone 3.2. Tombol boleh
