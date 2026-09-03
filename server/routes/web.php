@@ -6,11 +6,13 @@ use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\KelasController;
 use App\Http\Controllers\LkpdController;
+use App\Http\Controllers\OrangTuaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgresController;
 use App\Http\Controllers\ReaksiController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\TugasController;
+use App\Http\Controllers\UndanganController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,6 +34,10 @@ Route::post('/masuk-siswa', [SiswaAuthController::class, 'login'])->middleware([
 // LKPD publik dengan sengaja — bahan ajar, bukan data siswa (PRD 8),
 // jadi guru bisa cetak/bagikan tautannya tanpa harus login dulu.
 Route::get('/lkpd/{misiId}', [LkpdController::class, 'tampilkan'])->name('lkpd.tampilkan');
+
+// Halaman undangan publik (info saja, aman tanpa login) — menerimanya
+// (mutasi data) tetap wajib lewat middleware auth di bawah.
+Route::get('/undangan/{token}', [UndanganController::class, 'tampilkan'])->name('undangan.tampilkan');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -68,6 +74,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/karya/{karya}/tampilkan', [GaleriController::class, 'tampilkanKembali'])->name('karya.tampilkan');
     Route::post('/karya/{karya}/reaksi', [ReaksiController::class, 'simpan'])->name('karya.reaksi');
     Route::delete('/karya/{karya}/reaksi', [ReaksiController::class, 'hapus'])->name('karya.reaksi.hapus');
+
+    Route::post('/siswa/{siswa}/undang-orang-tua', [UndanganController::class, 'store'])->name('undangan.store');
+    Route::get('/undangan/{token}/terima', [UndanganController::class, 'terima'])->name('undangan.terima');
+
+    Route::get('/orang-tua/progres', [OrangTuaController::class, 'progres'])->name('orangtua.progres');
+    Route::post('/orang-tua/izin-publikasi', [OrangTuaController::class, 'ubahIzinPublikasi'])->name('orangtua.izin');
 });
 
 require __DIR__.'/auth.php';

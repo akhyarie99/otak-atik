@@ -39,6 +39,10 @@ class HandleInertiaRequests extends Middleware
             'keanggotaanAktif' => $keanggotaan
                 ? ['id' => $keanggotaan->id, 'peran' => $keanggotaan->peran->value, 'sekolah' => $keanggotaan->sekolah?->nama]
                 : null,
+            'flash' => [
+                'status' => $request->session()->get('status'),
+                'tautanUndangan' => $request->session()->get('tautanUndangan'),
+            ],
         ];
     }
 }

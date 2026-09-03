@@ -49,16 +49,20 @@ class ProgresController extends Controller
         return ['siswa' => $baris, 'daftarMisi' => $daftarMisi->values()];
     }
 
-    public function tampilkan(Kelas $kelas): Response
+    public function tampilkan(Request $request, Kelas $kelas): Response
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         return Inertia::render('Progres/Index', [
             'kelas' => $kelas->only('id', 'nama'),
             ...$this->susunProgres($kelas),
         ]);
     }
 
-    public function eksporCsv(Kelas $kelas)
+    public function eksporCsv(Request $request, Kelas $kelas)
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         $data = $this->susunProgres($kelas);
         $namaMisi = $data['daftarMisi']->pluck('judul');
 

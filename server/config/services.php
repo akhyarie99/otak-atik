@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // WhatsApp lewat Fonnte (PRD 6.8 & 9.2) — token belum tersedia di
+    // lingkungan ini. FonnteService no-op dengan aman kalau kosong,
+    // lihat catatan di app/Services/FonnteService.php.
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN'),
+        'url' => env('FONNTE_URL', 'https://api.fonnte.com/send'),
+    ],
+
 ];

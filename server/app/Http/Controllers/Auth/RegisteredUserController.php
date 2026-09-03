@@ -47,6 +47,11 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        // intended() alih-alih dashboard tetap: kalau pendaftaran ini
+        // dipicu lewat tautan undangan orang tua (rute itu dibungkus
+        // middleware auth, jadi pengunjung yang belum login otomatis
+        // mampir sini dulu), sesudah daftar langsung lanjut ke undangan
+        // itu, bukan tersasar ke dashboard kosong tanpa konteks anaknya.
+        return redirect()->intended(route('dashboard', absolute: false));
     }
 }

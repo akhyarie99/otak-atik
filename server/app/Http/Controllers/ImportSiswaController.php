@@ -29,6 +29,8 @@ class ImportSiswaController extends Controller
 
     public function pratinjau(Request $request, Kelas $kelas)
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         $request->validate([
             'berkas' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:5120'],
         ]);
@@ -50,6 +52,8 @@ class ImportSiswaController extends Controller
 
     public function proses(Request $request, Kelas $kelas)
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         $data = $request->validate([
             'token' => ['required', 'uuid'],
             'kolom_nama' => ['required', 'integer', 'min:0'],

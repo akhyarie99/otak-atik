@@ -56,7 +56,12 @@ class GaleriController extends Controller
     public function index(Request $request): Response
     {
         $keanggotaan = $this->keanggotaanAktif($request);
-        $isGuru = $keanggotaan->peran !== Peran::Siswa;
+        // Galeri untuk siswa (karyanya sendiri + teman) dan staf
+        // (pandangan moderasi) — BUKAN untuk orang tua. Permission
+        // matrix PRD: kolom "orang tua" kosong untuk "melihat karya
+        // sekelas"; orang tua punya halamannya sendiri (/orang-tua/progres).
+        abort_if($keanggotaan->peran === Peran::OrangTua, 403);
+        $isGuru = $keanggotaan->peran->bolehKelolaSekolah();
 
         $queryKelas = $this->karyaTerlihat();
         if ($isGuru) {
@@ -161,7 +166,7 @@ class GaleriController extends Controller
     public function promosikanSekolah(Request $request, Karya $karya): \Illuminate\Http\RedirectResponse
     {
         $keanggotaan = $this->keanggotaanAktif($request);
-        abort_if($keanggotaan->peran === Peran::Siswa, 403);
+        abort_unless($keanggotaan->peran->bolehKelolaSekolah(), 403);
         abort_if($karya->status_publikasi === 'privat', 422, 'Karya harus diterbitkan ke kelas lebih dulu.');
 
         $karya->update(['status_publikasi' => 'sekolah']);
@@ -172,7 +177,7 @@ class GaleriController extends Controller
     public function sembunyikan(Request $request, Karya $karya): \Illuminate\Http\RedirectResponse
     {
         $keanggotaan = $this->keanggotaanAktif($request);
-        abort_if($keanggotaan->peran === Peran::Siswa, 403);
+        abort_unless($keanggotaan->peran->bolehKelolaSekolah(), 403);
 
         // Guru cuma bisa MENYEMBUNYIKAN, bukan mengubah isi karya —
         // "Karya adalah milik anak" (CLAUDE.md, privasi anak).
@@ -184,7 +189,7 @@ class GaleriController extends Controller
     public function tampilkanKembali(Request $request, Karya $karya): \Illuminate\Http\RedirectResponse
     {
         $keanggotaan = $this->keanggotaanAktif($request);
-        abort_if($keanggotaan->peran === Peran::Siswa, 403);
+        abort_unless($keanggotaan->peran->bolehKelolaSekolah(), 403);
 
         $karya->update(['disembunyikan_oleh_guru' => false]);
 

@@ -34,4 +34,14 @@ enum Peran: string
     {
         return $this === self::PenulisKonten || $this === self::AdminPlatform;
     }
+
+    // Boleh mengelola data sekolah (kelas, tugas, papan progres semua
+    // siswa, moderasi galeri, undangan orang tua). SENGAJA daftar
+    // positif (bukan "peran !== Siswa") — sejak milestone 5.3 ada peran
+    // orang_tua yang BUKAN siswa tapi juga BUKAN staf (PRD lampiran:
+    // "Orang tua tidak bisa melihat siswa lain, hanya anaknya sendiri").
+    public function bolehKelolaSekolah(): bool
+    {
+        return $this === self::Guru || $this === self::AdminSekolah;
+    }
 }

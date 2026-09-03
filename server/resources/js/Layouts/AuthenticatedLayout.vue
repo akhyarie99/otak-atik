@@ -1,13 +1,16 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 
 const showingNavigationDropdown = ref(false);
+// Orang tua hanya melihat progres anaknya — bukan Kelas/Tugas/Galeri
+// (menu itu untuk guru & siswa yang punya keanggotaan berbeda).
+const isOrangTua = computed(() => usePage().props.keanggotaanAktif?.peran === 'orang_tua');
 </script>
 
 <template>
@@ -39,18 +42,25 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Dashboard
                                 </NavLink>
-                                <NavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
-                                    Kelas
-                                </NavLink>
-                                <NavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
-                                    Tugas
-                                </NavLink>
-                                <NavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
-                                    Galeri
-                                </NavLink>
-                                <NavLink :href="route('editor')" :active="route().current('editor')">
-                                    Editor
-                                </NavLink>
+                                <template v-if="isOrangTua">
+                                    <NavLink :href="route('orangtua.progres')" :active="route().current('orangtua.*')">
+                                        Progres anak
+                                    </NavLink>
+                                </template>
+                                <template v-else>
+                                    <NavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
+                                        Kelas
+                                    </NavLink>
+                                    <NavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
+                                        Tugas
+                                    </NavLink>
+                                    <NavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
+                                        Galeri
+                                    </NavLink>
+                                    <NavLink :href="route('editor')" :active="route().current('editor')">
+                                        Editor
+                                    </NavLink>
+                                </template>
                             </div>
                         </div>
 
@@ -158,18 +168,25 @@ const showingNavigationDropdown = ref(false);
                         >
                             Dashboard
                         </ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
-                            Kelas
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
-                            Tugas
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
-                            Galeri
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('editor')" :active="route().current('editor')">
-                            Editor
-                        </ResponsiveNavLink>
+                        <template v-if="isOrangTua">
+                            <ResponsiveNavLink :href="route('orangtua.progres')" :active="route().current('orangtua.*')">
+                                Progres anak
+                            </ResponsiveNavLink>
+                        </template>
+                        <template v-else>
+                            <ResponsiveNavLink :href="route('kelas.index')" :active="route().current('kelas.*')">
+                                Kelas
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('tugas.index')" :active="route().current('tugas.*')">
+                                Tugas
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('galeri.index')" :active="route().current('galeri.*')">
+                                Galeri
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('editor')" :active="route().current('editor')">
+                                Editor
+                            </ResponsiveNavLink>
+                        </template>
                     </div>
 
                     <!-- Responsive Settings Options -->

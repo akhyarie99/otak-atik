@@ -53,7 +53,14 @@ function buatSekolah() {
                     <p class="text-gray-900 dark:text-gray-100">
                         <strong>{{ keanggotaan.sekolah }}</strong> — {{ keanggotaan.peran }}
                     </p>
-                    <a :href="route('kelas.index')" class="mt-4 inline-block text-sm font-semibold text-indigo-600 hover:underline">
+                    <a
+                        v-if="keanggotaan.peran === 'orang_tua'"
+                        :href="route('orangtua.progres')"
+                        class="mt-4 inline-block text-sm font-semibold text-indigo-600 hover:underline"
+                    >
+                        Lihat progres anak &rarr;
+                    </a>
+                    <a v-else :href="route('kelas.index')" class="mt-4 inline-block text-sm font-semibold text-indigo-600 hover:underline">
                         Kelola kelas &rarr;
                     </a>
                 </div>

@@ -12,6 +12,8 @@ class TugasController extends Controller
 {
     public function index(Request $request): Response
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         $kelas = Kelas::orderBy('nama')->get(['id', 'nama']);
         $tugas = Tugas::with('kelas:id,nama')->latest()->get();
 
@@ -24,6 +26,8 @@ class TugasController extends Controller
 
     public function store(Request $request): \Illuminate\Http\RedirectResponse
     {
+        abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+
         $data = $request->validate([
             'kelas_id' => ['required', 'exists:kelas,id'],
             'misi_id' => ['required', 'string'],
