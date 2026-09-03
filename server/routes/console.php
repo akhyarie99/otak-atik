@@ -12,3 +12,8 @@ Artisan::command('inspire', function () {
 // dijalankan berkali-kali; lihat masing-masing command).
 Schedule::command('langganan:perpanjang')->daily();
 Schedule::command('tagihan:kirim-pengingat')->daily();
+
+// Milestone 7.3 (PRD 9.6) — cadangan harian. Pemulihan (cadangan:pulihkan)
+// SENGAJA tidak dijadwalkan — destruktif, cuma dijalankan manual saat
+// benar-benar perlu memulihkan.
+Schedule::command('cadangan:jalankan')->daily();

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Auth\SiswaAuthController;
+use App\Http\Controllers\GalatController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\KelasController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgresController;
 use App\Http\Controllers\ReaksiController;
 use App\Http\Controllers\SekolahController;
+use App\Http\Controllers\StatusController;
 use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\TugasController;
 use App\Http\Controllers\UndanganController;
@@ -36,6 +38,9 @@ Route::post('/masuk-siswa', [SiswaAuthController::class, 'login'])->middleware([
 // LKPD publik dengan sengaja — bahan ajar, bukan data siswa (PRD 8),
 // jadi guru bisa cetak/bagikan tautannya tanpa harus login dulu.
 Route::get('/lkpd/{misiId}', [LkpdController::class, 'tampilkan'])->name('lkpd.tampilkan');
+
+// Status layanan publik (milestone 7.3, PRD 9.6) — terbuka tanpa login.
+Route::get('/status', [StatusController::class, 'tampilkan'])->name('status.tampilkan');
 
 // Halaman undangan publik (info saja, aman tanpa login) — menerimanya
 // (mutasi data) tetap wajib lewat middleware auth di bawah.
@@ -94,6 +99,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/tagihan/{tagihan}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar');
     Route::get('/tagihan/{tagihan}/cetak', [TagihanController::class, 'cetak'])->name('tagihan.cetak');
     Route::post('/tagihan/{tagihan}/tandai-lunas', [TagihanController::class, 'tandaiLunas'])->name('tagihan.tandai-lunas');
+
+    Route::get('/admin/galat', [GalatController::class, 'tampilkan'])->name('galat.tampilkan');
 });
 
 require __DIR__.'/auth.php';
