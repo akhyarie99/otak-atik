@@ -29,10 +29,20 @@ class KelasController extends Controller
         $keanggotaan = $request->attributes->get('keanggotaan_aktif');
         abort_unless($keanggotaan->peran->bolehKelolaSekolah(), 403);
 
+        $sekolah = $keanggotaan->sekolah;
+
+        // Langganan hanya-baca (milestone 7.2, PRD 9.4) — dicek LEBIH
+        // DULU daripada kuota: pesannya beda ("langganan habis" vs
+        // "kuota tercapai"), guru perlu tahu yang mana.
+        if ($sekolah->hanyaBaca()) {
+            return back()->withErrors([
+                'kuota' => 'Langganan sekolah ini sudah berakhir (mode hanya-baca) — kelas dan karya lama tetap bisa dipakai, tapi tidak bisa menambah kelas baru. Perpanjang dulu.',
+            ]);
+        }
+
         // Kuota kelas (milestone 7.1, PRD 9.3) — "yang diblokir hanya
         // penambahan baru", jadi ditolak di SINI (sebelum kelas baru
         // dibuat), bukan mengunci kelas yang sudah ada.
-        $sekolah = $keanggotaan->sekolah;
         if (! $sekolah->bolehTambahKelas()) {
             return back()->withErrors([
                 'kuota' => "Paket {$sekolah->paket->label()} sudah mencapai batas {$sekolah->batasKelas()} kelas. Hubungi admin untuk meningkatkan paket.",

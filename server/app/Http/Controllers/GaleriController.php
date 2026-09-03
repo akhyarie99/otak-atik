@@ -130,6 +130,7 @@ class GaleriController extends Controller
         abort_unless($karya->terlihat(), 404);
 
         $keanggotaan = $this->keanggotaanAktif($request);
+        abort_if($keanggotaan->sekolah->hanyaBaca(), 422, 'Langganan sekolah ini sudah berakhir (mode hanya-baca) — karya lama tetap bisa dimainkan, tapi remix (karya baru) belum bisa sampai diperpanjang.');
 
         // Kuota karya per siswa (milestone 7.1, PRD 9.3) — cuma dicek di
         // sini (bukan di autosave biasa) karena remix adalah SATU-SATUNYA

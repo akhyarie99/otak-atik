@@ -5,12 +5,14 @@ use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\KelasController;
+use App\Http\Controllers\LanggananController;
 use App\Http\Controllers\LkpdController;
 use App\Http\Controllers\OrangTuaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgresController;
 use App\Http\Controllers\ReaksiController;
 use App\Http\Controllers\SekolahController;
+use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\TugasController;
 use App\Http\Controllers\UndanganController;
 use Illuminate\Foundation\Application;
@@ -38,6 +40,12 @@ Route::get('/lkpd/{misiId}', [LkpdController::class, 'tampilkan'])->name('lkpd.t
 // Halaman undangan publik (info saja, aman tanpa login) — menerimanya
 // (mutasi data) tetap wajib lewat middleware auth di bawah.
 Route::get('/undangan/{token}', [UndanganController::class, 'tampilkan'])->name('undangan.tampilkan');
+
+// Webhook Midtrans (milestone 7.2) — dipanggil Midtrans sendiri, BUKAN
+// pengguna berlogin, jadi sengaja di luar middleware auth/tenant.
+// Diverifikasi lewat tanda tangan (MidtransService::verifikasiSignature),
+// bukan sesi — itulah pengaman sungguhannya, bukan posisi rute ini.
+Route::post('/midtrans/webhook', [TagihanController::class, 'webhook'])->name('midtrans.webhook');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -80,6 +88,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/orang-tua/progres', [OrangTuaController::class, 'progres'])->name('orangtua.progres');
     Route::post('/orang-tua/izin-publikasi', [OrangTuaController::class, 'ubahIzinPublikasi'])->name('orangtua.izin');
+
+    Route::get('/langganan', [LanggananController::class, 'tampilkan'])->name('langganan.tampilkan');
+    Route::post('/langganan/mulai', [LanggananController::class, 'mulai'])->name('langganan.mulai');
+    Route::post('/tagihan/{tagihan}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar');
+    Route::get('/tagihan/{tagihan}/cetak', [TagihanController::class, 'cetak'])->name('tagihan.cetak');
+    Route::post('/tagihan/{tagihan}/tandai-lunas', [TagihanController::class, 'tandaiLunas'])->name('tagihan.tandai-lunas');
 });
 
 require __DIR__.'/auth.php';

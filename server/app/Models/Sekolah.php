@@ -17,7 +17,7 @@ class Sekolah extends Model
 
     protected $table = 'sekolah';
 
-    protected $fillable = ['nama', 'kode_sekolah', 'paket', 'batas_kelas', 'batas_siswa'];
+    protected $fillable = ['nama', 'kode_sekolah', 'paket', 'batas_kelas', 'batas_siswa', 'nomor_whatsapp'];
 
     protected $casts = [
         'paket' => Paket::class,
@@ -74,5 +74,29 @@ class Sekolah extends Model
         $batas = $this->batasKelas();
 
         return $batas === null || $this->kelas()->count() < $batas;
+    }
+
+    // --- Langganan (milestone 7.2, PRD 9.2 & 9.4) ---
+    // Paket Guru gratis TIDAK PERNAH punya baris Langganan sama sekali —
+    // cuma paket berbayar yang berlangganan, jadi "tidak ada langganan"
+    // untuk sekolah berpaket guru bukan galat, itu kondisi normal.
+
+    public function langganan(): HasMany
+    {
+        return $this->hasMany(Langganan::class, 'tenant_id');
+    }
+
+    public function langgananAktif(): ?Langganan
+    {
+        return $this->langganan()->latest('berakhir_pada')->first();
+    }
+
+    // Sekolah TERKUNCI hanya-baca (tidak bisa menambah kelas/siswa/karya
+    // baru) HANYA kalau ada Langganan berbayar yang statusnya sudah
+    // 'hanya_baca'. Paket Guru gratis (tanpa Langganan) TIDAK PERNAH
+    // hanya-baca — gratis ya gratis selamanya, bukan trial yang kedaluwarsa.
+    public function hanyaBaca(): bool
+    {
+        return $this->langgananAktif()?->hanyaBaca() ?? false;
     }
 }

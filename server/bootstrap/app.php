@@ -29,7 +29,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        //
+        // Webhook Midtrans (milestone 7.2) dipanggil Midtrans sendiri —
+        // tidak pernah membawa token CSRF Laravel. Diverifikasi lewat
+        // tanda tangan Midtrans sendiri (MidtransService::verifikasiSignature),
+        // bukan CSRF — pengecualian ini aman karena itu.
+        $middleware->validateCsrfTokens(except: ['midtrans/webhook']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

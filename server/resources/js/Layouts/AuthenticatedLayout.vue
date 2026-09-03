@@ -60,6 +60,9 @@ const isOrangTua = computed(() => usePage().props.keanggotaanAktif?.peran === 'o
                                     <NavLink :href="route('editor')" :active="route().current('editor')">
                                         Editor
                                     </NavLink>
+                                    <NavLink :href="route('langganan.tampilkan')" :active="route().current('langganan.*')">
+                                        Langganan
+                                    </NavLink>
                                 </template>
                             </div>
                         </div>
@@ -185,6 +188,9 @@ const isOrangTua = computed(() => usePage().props.keanggotaanAktif?.peran === 'o
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('editor')" :active="route().current('editor')">
                                 Editor
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('langganan.tampilkan')" :active="route().current('langganan.*')">
+                                Langganan
                             </ResponsiveNavLink>
                         </template>
                     </div>

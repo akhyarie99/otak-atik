@@ -26,6 +26,11 @@ return [
         'karya_per_siswa' => null,
         'penyimpanan_aset_per_siswa_mb' => 25,
         'ukuran_aset_mb' => 2,
+        // ANGKA SEMENTARA (placeholder) — belum ada keputusan harga
+        // sungguhan (butuh sekolah pertama yang mau bayar, lihat
+        // rencana-build.md). Cukup untuk mensimulasikan siklus penagihan
+        // penuh (milestone 7.2), BUKAN harga jual final.
+        'harga_tahunan' => 3_000_000,
     ],
     'yayasan' => [
         'label' => 'Yayasan (tahunan)',
@@ -34,5 +39,6 @@ return [
         'karya_per_siswa' => null,
         'penyimpanan_aset_per_siswa_mb' => 25,
         'ukuran_aset_mb' => 2,
+        'harga_tahunan' => 10_000_000, // ANGKA SEMENTARA — lihat catatan di atas
     ],
 ];

@@ -53,6 +53,7 @@ class ImportSiswaController extends Controller
     public function proses(Request $request, Kelas $kelas)
     {
         abort_unless($request->attributes->get('keanggotaan_aktif')->peran->bolehKelolaSekolah(), 403);
+        abort_if($kelas->sekolah->hanyaBaca(), 422, 'Langganan sekolah ini sudah berakhir (mode hanya-baca) — perpanjang dulu sebelum menambah siswa baru.');
 
         $data = $request->validate([
             'token' => ['required', 'uuid'],
